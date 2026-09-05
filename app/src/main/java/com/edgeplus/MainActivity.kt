@@ -67,7 +67,7 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         }
         val subText = TextView(this).apply {
-            text = "Volume & Notification Edge (Zero Accessibility • 100% Bank Safe)"
+            text = "Volume, Notification & Back Edge (Bank Safe)"
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             setPadding(0, 4, 0, 24)
@@ -317,8 +317,8 @@ class MainActivity : Activity() {
         labelPrefix: String
     ) {
         val directions = listOf(
-            "down" to "$labelPrefix • Diagonal Down",
             "straight" to "$labelPrefix • Inward",
+            "down" to "$labelPrefix • Diagonal Down",
             "up" to "$labelPrefix • Diagonal Up"
         )
         val actions = Action.entries
@@ -339,10 +339,11 @@ class MainActivity : Activity() {
 
             val spinner = Spinner(this).apply {
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#1E293B"))
+                    setColor(Color.parseColor("#334155")) // Slate 700 - clearly visible
                     cornerRadius = 12f
-                    setStroke(2, Color.parseColor("#334155"))
+                    setStroke(2, Color.parseColor("#64748B"))
                 }
+                setPadding(24, 16, 24, 16)
             }
             val adapter = object : ArrayAdapter<String>(
                 this,
@@ -352,8 +353,9 @@ class MainActivity : Activity() {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                     val v = super.getView(position, convertView, parent)
                     (v as? TextView)?.apply {
-                        setTextColor(Color.parseColor("#F8FAFC"))
+                        setTextColor(Color.WHITE)
                         textSize = 14f
+                        typeface = Typeface.DEFAULT_BOLD
                     }
                     return v
                 }
@@ -362,7 +364,9 @@ class MainActivity : Activity() {
                     val v = super.getDropDownView(position, convertView, parent)
                     (v as? TextView)?.apply {
                         setTextColor(Color.parseColor("#0F172A"))
-                        textSize = 14f
+                        setBackgroundColor(Color.WHITE)
+                        textSize = 15f
+                        setPadding(32, 24, 32, 24)
                     }
                     return v
                 }

@@ -185,8 +185,6 @@ class EdgeService : Service() {
         val minSwipeDistPx = 30 * density
         val longSwipeDistPx = 150 * density
 
-        android.util.Log.i("EdgeService", "Gesture raw: isRight=$isRight, dx=$dx, dy=$dy, inward=$inwardDist")
-
         if (inwardDist < minSwipeDistPx) {
             return
         }
@@ -202,7 +200,9 @@ class EdgeService : Service() {
         }
 
         val action = Prefs.getAction(this, side, type, dir)
-        ActionExecutor.execute(this, action)
+        if (action != Action.NONE) {
+            ActionExecutor.execute(this, action)
+        }
     }
 
     private fun vibrateShort() {

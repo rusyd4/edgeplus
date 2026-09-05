@@ -4,9 +4,9 @@ import android.content.Context
 
 enum class Action(val id: String, val title: String) {
     NONE("none", "None"),
+    BACK("back", "Back"),
     VOLUME_PANEL("volume_panel", "Open Volume Panel"),
-    NOTIFICATIONS("notifications", "Open Notification Panel"),
-    QUICK_PANEL("quick_panel", "Open Notification Panel");
+    NOTIFICATIONS("notifications", "Open Notification Panel");
 
     companion object {
         fun fromId(id: String?): Action = entries.firstOrNull { it.id == id } ?: NONE
@@ -81,6 +81,7 @@ object Prefs {
     private fun defaultActionFor(side: String, type: String, dir: String): Action {
         return if (type == "short") {
             when (dir) {
+                "straight" -> Action.BACK
                 "down" -> Action.VOLUME_PANEL
                 else -> Action.NONE
             }
