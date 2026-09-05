@@ -8,7 +8,6 @@ enum class Action(val id: String, val title: String) {
     VOLUME_PANEL("volume_panel", "Open Volume Panel"),
     NOTIFICATIONS("notifications", "Open Notification Panel"),
     TOGGLE_RINGER("toggle_ringer", "Toggle Ringer (Sound / Vibrate)"),
-    SMART_SIDEBAR("smart_sidebar", "Open Smart Sidebar (Vivo)"),
     BRIGHTNESS_SLIDER("brightness_slider", "Brightness Control (Drag Up/Down)");
 
     companion object {
@@ -86,7 +85,7 @@ object Prefs {
             when (dir) {
                 "straight" -> Action.BACK
                 "down" -> Action.VOLUME_PANEL
-                "up" -> Action.SMART_SIDEBAR
+                "up" -> Action.NONE
                 else -> Action.NONE
             }
         } else {

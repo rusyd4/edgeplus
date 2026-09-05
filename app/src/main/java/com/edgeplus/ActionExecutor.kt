@@ -185,7 +185,6 @@ object ActionExecutor {
             Action.VOLUME_PANEL -> openVolumePanel(context)
             Action.NOTIFICATIONS -> openNotificationPanel(context)
             Action.TOGGLE_RINGER -> toggleRingerMode(context)
-            Action.SMART_SIDEBAR -> openSmartSidebar(context)
             Action.BRIGHTNESS_SLIDER -> {} // Handled interactively during drag in EdgeService
         }
     }

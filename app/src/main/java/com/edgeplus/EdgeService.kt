@@ -190,7 +190,7 @@ class EdgeService : Service() {
 
                                 // Check if the long-swipe action for this direction is BRIGHTNESS_SLIDER
                                 val side = if (isRight) "right" else "left"
-                                val dir = getDirection(dy, density)
+                                val dir = getDirection(dx, dy, density, isRight)
                                 val assignedAction = Prefs.getAction(this@EdgeService, side, "long", dir)
                                 if (assignedAction == Action.BRIGHTNESS_SLIDER) {
                                     isDraggingBrightness = true
@@ -222,11 +222,17 @@ class EdgeService : Service() {
         return handle
     }
 
-    private fun getDirection(dy: Float, density: Float): String {
-        val diagonalThresholdPx = 40 * density
+    private fun getDirection(dx: Float, dy: Float, density: Float, isRight: Boolean): String {
+        val inwardDist = if (isRight) -dx else dx
+        val absDy = kotlin.math.abs(dy)
+        val minVerticalDeltaPx = 55 * density
+
+        // Requires clear vertical intent (dy must be at least 55dp AND slope dy/inward > 0.65)
+        // Otherwise it is treated as a straight inward swipe.
         return when {
-            dy < -diagonalThresholdPx -> "up"
-            dy > diagonalThresholdPx -> "down"
+            absDy >= minVerticalDeltaPx && absDy > (inwardDist * 0.65f) -> {
+                if (dy < 0) "up" else "down"
+            }
             else -> "straight"
         }
     }
@@ -242,7 +248,7 @@ class EdgeService : Service() {
 
         val type = if (inwardDist >= longSwipeDistPx) "long" else "short"
         val side = if (isRight) "right" else "left"
-        val dir = getDirection(dy, density)
+        val dir = getDirection(dx, dy, density, isRight)
 
         val action = Prefs.getAction(this, side, type, dir)
         ActionExecutor.execute(this, action)
