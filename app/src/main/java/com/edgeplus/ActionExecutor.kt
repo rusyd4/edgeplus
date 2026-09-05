@@ -54,10 +54,31 @@ object ActionExecutor {
         }
     }
 
+    fun isAutoBrightness(context: Context): Boolean {
+        return try {
+            val mode = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE)
+            mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun setBrightness(context: Context, value: Int) {
         try {
+            val cr = context.contentResolver
+            // If auto-brightness is active, temporarily switch to manual so manual adjustments take effect immediately
+            val mode = Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+            if (mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC) {
+                Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+            }
             val clamped = value.coerceIn(1, 255)
-            Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, clamped)
+            Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, clamped)
+
+            // Also set auto-brightness adjustment float (-1.0 to 1.0) so systems supporting adaptive brightness respect the offset
+            val adj = ((clamped / 255f) * 2f) - 1f
+            try {
+                Settings.System.putFloat(cr, "screen_auto_brightness_adj", adj)
+            } catch (_: Throwable) {}
         } catch (e: Throwable) {
             android.util.Log.e("ActionExecutor", "Failed to write brightness", e)
         }
