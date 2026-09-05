@@ -251,6 +251,7 @@ class EdgeService : Service() {
         val dir = getDirection(dx, dy, density, isRight)
 
         val action = Prefs.getAction(this, side, type, dir)
+        android.util.Log.i("EdgeService", "Gesture trigger: side=$side type=$type dir=$dir action=$action")
         ActionExecutor.execute(this, action)
     }
 

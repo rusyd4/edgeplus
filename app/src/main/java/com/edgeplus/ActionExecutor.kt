@@ -157,40 +157,35 @@ object ActionExecutor {
 
     fun startScreenRecording(context: Context) {
         val intentsToTry = listOf(
-            // Vivo / OriginOS S-Capture broadcasts & activities
-            Intent("com.vivo.smartshot.action.START_RECORD_SCREEN").apply {
+            Intent("com.vivo.smartshot.action.FLOATWINDOW").apply {
                 setPackage("com.vivo.smartshot")
-                addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            },
+            Intent("vivo.action.ACTION_FLOAT_MAIN_WINDOW").apply {
+                setPackage("com.vivo.smartshot")
             },
             Intent().apply {
-                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.ScreenRecordService")
-            },
-            Intent().apply {
-                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.FloatWindowService")
-            },
-            Intent("android.intent.action.MAIN").apply {
-                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.ScreenRecordActivity")
+                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.SettingMenuActivity")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         )
 
         for (intent in intentsToTry) {
             try {
-                if (intent.component?.className?.contains("Service") == true) {
-                    context.startService(intent)
-                    return
-                } else if (intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0) {
+                if (intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0) {
                     context.startActivity(intent)
                     return
                 } else {
                     context.sendBroadcast(intent)
                 }
-            } catch (_: Throwable) {}
+            } catch (t: Throwable) {
+                android.util.Log.w("ActionExecutor", "Failed intent: $intent", t)
+            }
         }
     }
 
     fun triggerBack() {
         Thread {
+            android.util.Log.i("ActionExecutor", "triggerBack called")
             try {
                 // Method 1: InputManager reflection (immediate kernel input event)
                 val imClass = Class.forName("android.hardware.input.InputManager")
@@ -206,8 +201,9 @@ object ActionExecutor {
                 val eventDown = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0)
                 val eventUp = KeyEvent(downTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0)
 
-                injectMethod.invoke(im, eventDown, 0)
-                injectMethod.invoke(im, eventUp, 0)
+                val r1 = injectMethod.invoke(im, eventDown, 0)
+                val r2 = injectMethod.invoke(im, eventUp, 0)
+                android.util.Log.i("ActionExecutor", "InputManager inject result: down=$r1 up=$r2")
                 return@Thread
             } catch (e: Throwable) {
                 android.util.Log.w("ActionExecutor", "InputManager inject failed", e)
