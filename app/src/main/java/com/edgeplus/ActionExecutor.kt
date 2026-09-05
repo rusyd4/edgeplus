@@ -92,12 +92,25 @@ object ActionExecutor {
                 val im = getInstanceMethod.invoke(null)
                 val injectMethod = imClass.getMethod("injectInputEvent", android.view.InputEvent::class.java, Int::class.javaPrimitiveType)
 
+                // Query Vivo's exact registered gesture range in System Settings
+                var dockY = 520f
+                try {
+                    val rangeStr = Settings.Secure.getString(context.contentResolver, "side_dock_gesture_range")
+                    if (!rangeStr.isNullOrEmpty()) {
+                        val parts = rangeStr.split(";")
+                        if (parts.size >= 4) {
+                            val top = parts[1].toFloat()
+                            val bottom = parts[3].toFloat()
+                            dockY = (top + bottom) / 2f
+                        }
+                    }
+                } catch (_: Throwable) {}
+
                 val dm = context.resources.displayMetrics
                 val screenWidth = dm.widthPixels.toFloat()
 
-                val startX = screenWidth - 2f
+                val startX = screenWidth - 5f
                 val endX = screenWidth - (120f * dm.density)
-                val y = 480f * (dm.heightPixels / 2400f)
 
                 val downTime = SystemClock.uptimeMillis()
 
@@ -122,18 +135,18 @@ object ActionExecutor {
                     event.recycle()
                 }
 
-                injectTouch(MotionEvent.ACTION_DOWN, startX, y, downTime)
+                injectTouch(MotionEvent.ACTION_DOWN, startX, dockY, downTime)
 
-                for (i in 1..10) {
-                    Thread.sleep(20)
+                for (i in 1..15) {
+                    Thread.sleep(25)
                     val currTime = SystemClock.uptimeMillis()
-                    val currX = startX + (endX - startX) * (i / 10f)
-                    injectTouch(MotionEvent.ACTION_MOVE, currX, y, currTime)
+                    val currX = startX + (endX - startX) * (i / 15f)
+                    injectTouch(MotionEvent.ACTION_MOVE, currX, dockY, currTime)
                 }
 
-                Thread.sleep(400)
+                Thread.sleep(600) // Vivo requires a longer hold threshold on OriginOS 5
                 val upTime = SystemClock.uptimeMillis()
-                injectTouch(MotionEvent.ACTION_UP, endX, y, upTime)
+                injectTouch(MotionEvent.ACTION_UP, endX, dockY, upTime)
 
             } catch (e: Throwable) {
                 android.util.Log.e("ActionExecutor", "Failed to trigger Smart Sidebar", e)
