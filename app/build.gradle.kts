@@ -11,14 +11,26 @@ android {
         applicationId = "com.edgeplus"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("keystore.jks")
+            storePassword = "edgeplus"
+            keyAlias = "edgeplus"
+            keyPassword = "edgeplus"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -33,5 +45,5 @@ android {
 }
 
 dependencies {
-    // ponytail: no external deps. stdlib and platform android only.
+    // ponytail: zero external deps, pure android framework
 }

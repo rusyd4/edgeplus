@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.Display
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -52,6 +53,23 @@ class EdgeService : Service() {
         rightHandle = createHandle(isRight = true)
     }
 
+    @Suppress("DEPRECATION")
+    private fun findHighestRefreshRateModeId(display: Display?): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && display != null) {
+            val modes = display.supportedModes
+            var bestMode = display.mode
+            var highestRate = bestMode.refreshRate
+            for (m in modes) {
+                if (m.refreshRate > highestRate) {
+                    highestRate = m.refreshRate
+                    bestMode = m
+                }
+            }
+            return bestMode.modeId
+        }
+        return 0
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun createHandle(isRight: Boolean): View {
         val dm = resources.displayMetrics
@@ -87,14 +105,31 @@ class EdgeService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = (if (isRight) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
+            // Request 120Hz+ high refresh rate on Android 6.0+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display
+                } else {
+                    windowManager?.defaultDisplay
+                }
+                val modeId = findHighestRefreshRateModeId(display)
+                if (modeId > 0) {
+                    preferredDisplayModeId = modeId
+                }
+            }
+            // Request 120Hz on Android 11+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                preferredRefreshRate = 120f
+            }
         }
 
         val alphaVal = ((alphaPercent / 100f) * 255).toInt().coerceIn(0, 255)
         val handle = View(this).apply {
-            setBackgroundColor(Color.argb(alphaVal, 0, 150, 255))
+            setBackgroundColor(Color.argb(alphaVal, 56, 189, 248))
             setOnTouchListener(object : View.OnTouchListener {
                 private var startX = 0f
                 private var startY = 0f
+                private var hasVibratedShort = false
                 private var hasVibratedLong = false
 
                 override fun onTouch(v: View?, event: MotionEvent): Boolean {
@@ -102,16 +137,28 @@ class EdgeService : Service() {
                         MotionEvent.ACTION_DOWN -> {
                             startX = event.rawX
                             startY = event.rawY
+                            hasVibratedShort = false
                             hasVibratedLong = false
                             return true
                         }
                         MotionEvent.ACTION_MOVE -> {
                             val dx = event.rawX - startX
                             val inwardDist = if (isRight) -dx else dx
+                            val shortSwipeDistPx = 30 * density
                             val longSwipeDistPx = 150 * density
+
+                            // Trigger short swipe haptic upon crossing short threshold
+                            if (inwardDist >= shortSwipeDistPx && !hasVibratedShort) {
+                                hasVibratedShort = true
+                                if (Prefs.isVibrateOnShortSwipe(this@EdgeService)) {
+                                    vibrateShort()
+                                }
+                            }
+
+                            // Trigger long swipe haptic upon crossing long threshold
                             if (inwardDist >= longSwipeDistPx && !hasVibratedLong) {
                                 hasVibratedLong = true
-                                vibrate()
+                                vibrateLong()
                             }
                             return true
                         }
@@ -154,12 +201,25 @@ class EdgeService : Service() {
         EdgeAccessibilityService.execute(this, action)
     }
 
-    private fun vibrate() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+    private fun vibrateShort() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createOneShot(12, 100))
         } else {
             @Suppress("DEPRECATION")
-            vibrator?.vibrate(20)
+            vibrator?.vibrate(12)
+        }
+    }
+
+    private fun vibrateLong() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createOneShot(28, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(28)
         }
     }
 

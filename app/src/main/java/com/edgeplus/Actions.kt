@@ -20,7 +20,6 @@ enum class Action(val id: String, val title: String) {
 object Prefs {
     private const val PREFS_NAME = "edgeplus_prefs"
 
-    // Gesture mappings
     fun getAction(context: Context, side: String, type: String, dir: String): Action {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val defaultAction = defaultActionFor(side, type, dir)
@@ -35,10 +34,9 @@ object Prefs {
             .apply()
     }
 
-    // Geometry settings (dp)
     fun getHandleWidthDp(context: Context): Int {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt("handle_width_dp", 28)
+            .getInt("handle_width_dp", 24)
     }
 
     fun setHandleWidthDp(context: Context, width: Int) {
@@ -49,7 +47,6 @@ object Prefs {
     }
 
     fun getHandleHeightPercent(context: Context): Int {
-        // 100 means full height
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt("handle_height_percent", 100)
     }
@@ -62,15 +59,26 @@ object Prefs {
     }
 
     fun getHandleAlphaPercent(context: Context): Int {
-        // 0 to 100 (0 = invisible)
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt("handle_alpha_percent", 15)
+            .getInt("handle_alpha_percent", 10)
     }
 
     fun setHandleAlphaPercent(context: Context, alpha: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt("handle_alpha_percent", alpha)
+            .apply()
+    }
+
+    fun isVibrateOnShortSwipe(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean("vibrate_short", true)
+    }
+
+    fun setVibrateOnShortSwipe(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("vibrate_short", enabled)
             .apply()
     }
 
