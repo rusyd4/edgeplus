@@ -225,14 +225,14 @@ class EdgeService : Service() {
     private fun getDirection(dx: Float, dy: Float, density: Float, isRight: Boolean): String {
         val inwardDist = if (isRight) -dx else dx
         val absDy = kotlin.math.abs(dy)
-        val minVerticalDeltaPx = 55 * density
+        val minVerticalDeltaPx = 35 * density
 
-        // Requires clear vertical intent (dy must be at least 55dp AND slope dy/inward > 0.65)
-        // Otherwise it is treated as a straight inward swipe.
         return when {
-            absDy >= minVerticalDeltaPx && absDy > (inwardDist * 0.65f) -> {
+            // If vertical movement is greater than inward horizontal movement AND exceeds 35dp -> diagonal
+            absDy >= minVerticalDeltaPx && absDy > inwardDist -> {
                 if (dy < 0) "up" else "down"
             }
+            // All other forward movement towards the center is a clean straight inward swipe (Back)
             else -> "straight"
         }
     }

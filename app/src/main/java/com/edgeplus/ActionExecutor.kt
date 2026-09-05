@@ -191,10 +191,15 @@ object ActionExecutor {
     fun triggerBack() {
         Thread {
             try {
+                // Method 1: InputManager reflection (immediate kernel input event)
                 val imClass = Class.forName("android.hardware.input.InputManager")
                 val getInstanceMethod = imClass.getMethod("getInstance")
                 val im = getInstanceMethod.invoke(null)
-                val injectMethod = imClass.getMethod("injectInputEvent", android.view.InputEvent::class.java, Int::class.javaPrimitiveType)
+                val injectMethod = imClass.getMethod(
+                    "injectInputEvent",
+                    android.view.InputEvent::class.java,
+                    Int::class.javaPrimitiveType
+                )
 
                 val downTime = SystemClock.uptimeMillis()
                 val eventDown = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0)
@@ -202,12 +207,24 @@ object ActionExecutor {
 
                 injectMethod.invoke(im, eventDown, 0)
                 injectMethod.invoke(im, eventUp, 0)
+                return@Thread
             } catch (e: Throwable) {
-                try {
-                    android.app.Instrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-                } catch (t: Throwable) {
-                    android.util.Log.e("ActionExecutor", "Failed to inject back", t)
-                }
+                android.util.Log.w("ActionExecutor", "InputManager inject failed", e)
+            }
+
+            try {
+                // Method 2: Instrumentation
+                android.app.Instrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                return@Thread
+            } catch (t: Throwable) {
+                android.util.Log.w("ActionExecutor", "Instrumentation inject failed", t)
+            }
+
+            try {
+                // Method 3: runtime shell input keyevent
+                Runtime.getRuntime().exec(arrayOf("input", "keyevent", "4")).waitFor()
+            } catch (r: Throwable) {
+                android.util.Log.e("ActionExecutor", "Shell inject failed", r)
             }
         }.start()
     }
