@@ -11,8 +11,8 @@ android {
         applicationId = "com.edgeplus"
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.2.4"
+        versionCode = 9
+        versionName = "1.3.0"
     }
 
     signingConfigs {
@@ -45,5 +45,5 @@ android {
 }
 
 dependencies {
-    implementation(fileTree("libs") { include("*.aar", "*.jar") })
+    // zero external deps, 100% native Android SDK
 }

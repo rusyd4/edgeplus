@@ -2,6 +2,7 @@ package com.edgeplus
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.view.accessibility.AccessibilityEvent
 
@@ -12,7 +13,23 @@ class EdgeAccessibilityService : AccessibilityService() {
         instance = this
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val pkg = event.packageName?.toString() ?: return
+            handleForegroundPackage(pkg)
+        }
+    }
+
+    private fun handleForegroundPackage(pkg: String) {
+        val isBanking = BankingProtection.isBankingPackage(pkg)
+        if (isBanking) {
+            // When banking app is detected in foreground, disable accessibility immediately
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                disableSelf()
+            }
+        }
+    }
+
     override fun onInterrupt() {}
 
     override fun onDestroy() {
@@ -47,15 +64,6 @@ class EdgeAccessibilityService : AccessibilityService() {
 
         fun recents(): Boolean {
             return instance?.performGlobalAction(GLOBAL_ACTION_RECENTS) ?: false
-        }
-
-        fun openVolumePanel(context: Context) {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            audioManager?.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
-        }
-
-        fun execute(context: Context, action: Action) {
-            ActionExecutor.execute(context, action)
         }
     }
 }

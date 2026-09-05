@@ -1,6 +1,9 @@
 package com.edgeplus
 
 import android.app.Activity
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -9,7 +12,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Display
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
@@ -21,19 +23,14 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
-import rikka.shizuku.Shizuku
 
 class MainActivity : Activity() {
 
     private lateinit var statusCard: LinearLayout
     private lateinit var overlayBadge: TextView
     private lateinit var a11yBadge: TextView
-    private lateinit var shizukuBadge: TextView
+    private lateinit var adminBadge: TextView
     private lateinit var hzBadge: TextView
-
-    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-        updateStatus()
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +44,7 @@ class MainActivity : Activity() {
                 val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     this.display
                 } else {
+                    @Suppress("DEPRECATION")
                     windowManager?.defaultDisplay
                 }
                 val mode = display?.supportedModes?.maxByOrNull { it.refreshRate }
@@ -74,7 +72,7 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         }
         val subText = TextView(this).apply {
-            text = "One Hand Operation + Alternative for iQOO"
+            text = "One Hand Operation + Alternative (Bank-Safe)"
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             setPadding(0, 4, 0, 24)
@@ -93,9 +91,9 @@ class MainActivity : Activity() {
         }
         statusCard.addView(cardTitle)
 
-        shizukuBadge = createStatusRow(statusCard, "Shizuku Mode (No A11y)")
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
-        a11yBadge = createStatusRow(statusCard, "Accessibility Fallback")
+        adminBadge = createStatusRow(statusCard, "Device Admin (Native Screen Off)")
+        a11yBadge = createStatusRow(statusCard, "A11y (Auto-Paused in Banks)")
         hzBadge = createStatusRow(statusCard, "Display Refresh Rate")
 
         // Quick Permission Action Buttons
@@ -107,12 +105,7 @@ class MainActivity : Activity() {
             )
             setPadding(0, 24, 0, 0)
         }
-        val shizukuBtn = createButton("Auth Shizuku", "#0369A1") {
-            if (ActionExecutor.isShizukuAvailable()) {
-                ActionExecutor.requestShizukuPermission(1001)
-            }
-        }
-        val overlayBtn = createButton("Grant Overlay", "#1E293B") {
+        val overlayBtn = createButton("Grant Overlay", "#0284C7") {
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -120,12 +113,25 @@ class MainActivity : Activity() {
                 )
             )
         }
-        val a11yBtn = createButton("Fallback A11y", "#1E293B") {
+        val adminBtn = createButton("Enable Admin", "#0F766E") {
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(
+                    DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                    ComponentName(this@MainActivity, AdminReceiver::class.java)
+                )
+                putExtra(
+                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "Allows EdgePlus to lock screen natively without accessibility."
+                )
+            }
+            startActivity(intent)
+        }
+        val a11yBtn = createButton("Enable A11y", "#1E293B") {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
-        btnRow.addView(shizukuBtn)
-        btnRow.addView(createSpacer(8))
         btnRow.addView(overlayBtn)
+        btnRow.addView(createSpacer(8))
+        btnRow.addView(adminBtn)
         btnRow.addView(createSpacer(8))
         btnRow.addView(a11yBtn)
         statusCard.addView(btnRow)
@@ -407,36 +413,22 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (ActionExecutor.isShizukuAvailable()) {
-            Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
-        }
         updateStatus()
     }
 
-    override fun onPause() {
-        super.onPause()
-        if (ActionExecutor.isShizukuAvailable()) {
-            Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
-        }
-    }
-
     private fun updateStatus() {
-        val shizukuOk = ActionExecutor.hasShizukuPermission()
+        val adminOk = ActionExecutor.isDeviceAdminActive(this)
         val overlayOk = Settings.canDrawOverlays(this)
         val a11yOk = EdgeAccessibilityService.isRunning()
-
-        shizukuBadge.text = when {
-            shizukuOk -> "ACTIVE (SECURE)"
-            ActionExecutor.isShizukuAvailable() -> "UNAUTHORIZED"
-            else -> "NOT RUNNING"
-        }
-        shizukuBadge.setTextColor(Color.parseColor(if (shizukuOk) "#4ADE80" else "#F87171"))
 
         overlayBadge.text = if (overlayOk) "GRANTED" else "MISSING"
         overlayBadge.setTextColor(Color.parseColor(if (overlayOk) "#4ADE80" else "#F87171"))
 
-        a11yBadge.text = if (a11yOk) "ENABLED" else "DISABLED"
-        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#FBBF24" else "#94A3B8"))
+        adminBadge.text = if (adminOk) "ACTIVE (SECURE)" else "DISABLED"
+        adminBadge.setTextColor(Color.parseColor(if (adminOk) "#4ADE80" else "#F87171"))
+
+        a11yBadge.text = if (a11yOk) "ENABLED" else "PAUSED / DISABLED"
+        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#38BDF8" else "#94A3B8"))
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

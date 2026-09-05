@@ -185,6 +185,8 @@ class EdgeService : Service() {
         val minSwipeDistPx = 30 * density
         val longSwipeDistPx = 150 * density
 
+        android.util.Log.i("EdgeService", "Gesture raw: isRight=$isRight, dx=$dx, dy=$dy, inward=$inwardDist")
+
         if (inwardDist < minSwipeDistPx) {
             return
         }
