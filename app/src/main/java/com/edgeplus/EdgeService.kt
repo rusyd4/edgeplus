@@ -107,7 +107,6 @@ class EdgeService : Service() {
             heightPx,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
@@ -153,6 +152,7 @@ class EdgeService : Service() {
                             hasVibratedLong = false
                             isDraggingBrightness = false
                             lastReportedPercent = -1
+                            android.util.Log.e("EdgePlus_Touch", "ACTION_DOWN: x=$startX, y=$startY")
                             return true
                         }
                         MotionEvent.ACTION_MOVE -> {
@@ -161,6 +161,8 @@ class EdgeService : Service() {
                             val inwardDist = if (isRight) -dx else dx
                             val shortSwipeDistPx = 30 * density
                             val longSwipeDistPx = 150 * density
+
+                            android.util.Log.e("EdgePlus_Touch", "ACTION_MOVE: dx=$dx, inward=$inwardDist")
 
                             if (isDraggingBrightness) {
                                 // Real-time drag adjusting brightness: drag up = brighter, drag down = darker
@@ -242,6 +244,8 @@ class EdgeService : Service() {
         val minSwipeDistPx = 30 * density
         val longSwipeDistPx = 150 * density
 
+        android.util.Log.e("EdgePlus_Touch", "ACTION_UP evaluate: inwardDist=$inwardDist, min=$minSwipeDistPx")
+
         if (inwardDist < minSwipeDistPx) {
             return
         }
@@ -251,7 +255,7 @@ class EdgeService : Service() {
         val dir = getDirection(dx, dy, density, isRight)
 
         val action = Prefs.getAction(this, side, type, dir)
-        android.util.Log.i("EdgeService", "Gesture trigger: side=$side type=$type dir=$dir action=$action")
+        android.util.Log.e("EdgePlus_Touch", "Gesture trigger: side=$side type=$type dir=$dir action=$action")
         ActionExecutor.execute(this, action)
     }
 
