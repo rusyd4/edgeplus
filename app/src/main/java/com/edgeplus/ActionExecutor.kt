@@ -155,34 +155,6 @@ object ActionExecutor {
         }.start()
     }
 
-    fun startScreenRecording(context: Context) {
-        val intentsToTry = listOf(
-            Intent("com.vivo.smartshot.action.FLOATWINDOW").apply {
-                setPackage("com.vivo.smartshot")
-            },
-            Intent("vivo.action.ACTION_FLOAT_MAIN_WINDOW").apply {
-                setPackage("com.vivo.smartshot")
-            },
-            Intent().apply {
-                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.SettingMenuActivity")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-
-        for (intent in intentsToTry) {
-            try {
-                if (intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0) {
-                    context.startActivity(intent)
-                    return
-                } else {
-                    context.sendBroadcast(intent)
-                }
-            } catch (t: Throwable) {
-                android.util.Log.w("ActionExecutor", "Failed intent: $intent", t)
-            }
-        }
-    }
-
     fun triggerBack() {
         Thread {
             android.util.Log.i("ActionExecutor", "triggerBack called")
@@ -233,7 +205,6 @@ object ActionExecutor {
             Action.VOLUME_PANEL -> openVolumePanel(context)
             Action.NOTIFICATIONS -> openNotificationPanel(context)
             Action.TOGGLE_RINGER -> toggleRingerMode(context)
-            Action.SCREEN_RECORD -> startScreenRecording(context)
             Action.BRIGHTNESS_SLIDER -> {} // Handled interactively during drag in EdgeService
         }
     }

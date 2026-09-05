@@ -8,8 +8,7 @@ enum class Action(val id: String, val title: String) {
     VOLUME_PANEL("volume_panel", "Open Volume Panel"),
     NOTIFICATIONS("notifications", "Open Notification Panel"),
     TOGGLE_RINGER("toggle_ringer", "Toggle Ringer (Sound / Vibrate)"),
-    BRIGHTNESS_SLIDER("brightness_slider", "Brightness Control (Drag Up/Down)"),
-    SCREEN_RECORD("screen_record", "Start Screen Recording (Vivo S-Capture)");
+    BRIGHTNESS_SLIDER("brightness_slider", "Brightness Control (Drag Up/Down)");
 
     companion object {
         fun fromId(id: String?): Action = entries.firstOrNull { it.id == id } ?: NONE
