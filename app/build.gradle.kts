@@ -11,8 +11,8 @@ android {
         applicationId = "com.edgeplus"
         minSdk = 28
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.3.0"
+        versionCode = 10
+        versionName = "2.0.0"
     }
 
     signingConfigs {

@@ -4,13 +4,9 @@ import android.content.Context
 
 enum class Action(val id: String, val title: String) {
     NONE("none", "None"),
-    BACK("back", "Back"),
-    HOME("home", "Home"),
-    RECENTS("recents", "Recent Apps"),
     VOLUME_PANEL("volume_panel", "Open Volume Panel"),
-    QUICK_PANEL("quick_panel", "Open Quick Settings"),
-    NOTIFICATIONS("notifications", "Open Notifications"),
-    SCREEN_OFF("screen_off", "Turn Off Screen");
+    NOTIFICATIONS("notifications", "Open Notification Panel"),
+    QUICK_PANEL("quick_panel", "Open Notification Panel");
 
     companion object {
         fun fromId(id: String?): Action = entries.firstOrNull { it.id == id } ?: NONE
@@ -85,16 +81,13 @@ object Prefs {
     private fun defaultActionFor(side: String, type: String, dir: String): Action {
         return if (type == "short") {
             when (dir) {
-                "straight" -> Action.BACK
-                "up" -> Action.SCREEN_OFF
-                "down" -> Action.QUICK_PANEL
+                "down" -> Action.VOLUME_PANEL
                 else -> Action.NONE
             }
         } else {
+            // long swipe
             when (dir) {
-                "straight" -> Action.VOLUME_PANEL
-                "up" -> Action.HOME
-                "down" -> Action.RECENTS
+                "down" -> Action.NOTIFICATIONS
                 else -> Action.NONE
             }
         }

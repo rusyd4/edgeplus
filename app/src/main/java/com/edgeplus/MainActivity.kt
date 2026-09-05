@@ -1,9 +1,6 @@
 package com.edgeplus
 
 import android.app.Activity
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -28,8 +25,6 @@ class MainActivity : Activity() {
 
     private lateinit var statusCard: LinearLayout
     private lateinit var overlayBadge: TextView
-    private lateinit var a11yBadge: TextView
-    private lateinit var adminBadge: TextView
     private lateinit var hzBadge: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,7 +67,7 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         }
         val subText = TextView(this).apply {
-            text = "One Hand Operation + Alternative (Bank-Safe)"
+            text = "Volume & Notification Edge (Zero Accessibility • 100% Bank Safe)"
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             setPadding(0, 4, 0, 24)
@@ -92,8 +87,6 @@ class MainActivity : Activity() {
         statusCard.addView(cardTitle)
 
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
-        adminBadge = createStatusRow(statusCard, "Device Admin (Native Screen Off)")
-        a11yBadge = createStatusRow(statusCard, "A11y (Auto-Paused in Banks)")
         hzBadge = createStatusRow(statusCard, "Display Refresh Rate")
 
         // Quick Permission Action Buttons
@@ -113,27 +106,7 @@ class MainActivity : Activity() {
                 )
             )
         }
-        val adminBtn = createButton("Enable Admin", "#0F766E") {
-            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                putExtra(
-                    DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-                    ComponentName(this@MainActivity, AdminReceiver::class.java)
-                )
-                putExtra(
-                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                    "Allows EdgePlus to lock screen natively without accessibility."
-                )
-            }
-            startActivity(intent)
-        }
-        val a11yBtn = createButton("Enable A11y", "#1E293B") {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
         btnRow.addView(overlayBtn)
-        btnRow.addView(createSpacer(8))
-        btnRow.addView(adminBtn)
-        btnRow.addView(createSpacer(8))
-        btnRow.addView(a11yBtn)
         statusCard.addView(btnRow)
 
         root.addView(statusCard)
@@ -169,7 +142,7 @@ class MainActivity : Activity() {
         sizeCard.addView(createCardHeader("HANDLE & FEEDBACK"))
 
         val vibrateBox = CheckBox(this).apply {
-            text = "Vibrate on short swipe detection"
+            text = "Vibrate on gesture detection"
             setTextColor(Color.parseColor("#E2E8F0"))
             isChecked = Prefs.isVibrateOnShortSwipe(this@MainActivity)
             setOnCheckedChangeListener { _, isChecked ->
@@ -344,9 +317,9 @@ class MainActivity : Activity() {
         labelPrefix: String
     ) {
         val directions = listOf(
+            "down" to "$labelPrefix • Diagonal Down",
             "straight" to "$labelPrefix • Inward",
-            "up" to "$labelPrefix • Diagonal Up",
-            "down" to "$labelPrefix • Diagonal Down"
+            "up" to "$labelPrefix • Diagonal Up"
         )
         val actions = Action.entries
         val actionTitles = actions.map { it.title }
@@ -417,18 +390,9 @@ class MainActivity : Activity() {
     }
 
     private fun updateStatus() {
-        val adminOk = ActionExecutor.isDeviceAdminActive(this)
         val overlayOk = Settings.canDrawOverlays(this)
-        val a11yOk = EdgeAccessibilityService.isRunning()
-
         overlayBadge.text = if (overlayOk) "GRANTED" else "MISSING"
         overlayBadge.setTextColor(Color.parseColor(if (overlayOk) "#4ADE80" else "#F87171"))
-
-        adminBadge.text = if (adminOk) "ACTIVE (SECURE)" else "DISABLED"
-        adminBadge.setTextColor(Color.parseColor(if (adminOk) "#4ADE80" else "#F87171"))
-
-        a11yBadge.text = if (a11yOk) "ENABLED" else "PAUSED / DISABLED"
-        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#38BDF8" else "#94A3B8"))
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
