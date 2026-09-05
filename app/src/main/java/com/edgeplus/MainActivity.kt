@@ -38,6 +38,24 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Request 120Hz+ on Activity window
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.attributes.preferredRefreshRate = 120f
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    this.display
+                } else {
+                    windowManager?.defaultDisplay
+                }
+                val mode = display?.supportedModes?.maxByOrNull { it.refreshRate }
+                if (mode != null) {
+                    window.attributes.preferredDisplayModeId = mode.modeId
+                }
+            }
+        } catch (_: Throwable) {}
+
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#0F172A")) // Slate 900
         }
@@ -83,6 +101,10 @@ class MainActivity : Activity() {
         // Quick Permission Action Buttons
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
             setPadding(0, 24, 0, 0)
         }
         val shizukuBtn = createButton("Auth Shizuku", "#0369A1") {
@@ -109,11 +131,15 @@ class MainActivity : Activity() {
         statusCard.addView(btnRow)
 
         root.addView(statusCard)
-        root.addView(createSpacer(24))
+        root.addView(createVerticalSpacer(24))
 
         // Service Start / Stop Action
         val serviceRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         val startBtn = createButton("Start Service", "#0284C7") {
             if (!Settings.canDrawOverlays(this@MainActivity)) {
@@ -130,7 +156,7 @@ class MainActivity : Activity() {
         serviceRow.addView(createSpacer(16))
         serviceRow.addView(stopBtn)
         root.addView(serviceRow)
-        root.addView(createSpacer(28))
+        root.addView(createVerticalSpacer(28))
 
         // Handle Size & Haptic Section Card
         val sizeCard = createCardLayout()
@@ -160,7 +186,7 @@ class MainActivity : Activity() {
             reloadService()
         }
         root.addView(sizeCard)
-        root.addView(createSpacer(24))
+        root.addView(createVerticalSpacer(24))
 
         // Right Handle Gestures Card
         val rightCard = createCardLayout()
@@ -168,7 +194,7 @@ class MainActivity : Activity() {
         buildGestureGroup(rightCard, side = "right", type = "short", labelPrefix = "Short Swipe")
         buildGestureGroup(rightCard, side = "right", type = "long", labelPrefix = "Long Swipe")
         root.addView(rightCard)
-        root.addView(createSpacer(24))
+        root.addView(createVerticalSpacer(24))
 
         // Left Handle Gestures Card
         val leftCard = createCardLayout()
@@ -230,22 +256,35 @@ class MainActivity : Activity() {
     }
 
     private fun createButton(title: String, bgColor: String, onClick: () -> Unit): Button {
+        val density = resources.displayMetrics.density
+        val minHeightPx = (44 * density).toInt()
         return Button(this).apply {
             text = title
             setTextColor(Color.WHITE)
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
             isAllCaps = false
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            minHeight = minHeightPx
+            layoutParams = LinearLayout.LayoutParams(0, minHeightPx, 1f)
             background = GradientDrawable().apply {
                 setColor(Color.parseColor(bgColor))
-                cornerRadius = 16f
+                cornerRadius = 14 * density
             }
             setOnClickListener { onClick() }
         }
     }
 
     private fun createSpacer(sizeDp: Int): View {
+        val px = (sizeDp * resources.displayMetrics.density).toInt()
+        return View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                px,
+                px
+            )
+        }
+    }
+
+    private fun createVerticalSpacer(sizeDp: Int): View {
         val px = (sizeDp * resources.displayMetrics.density).toInt()
         return View(this).apply {
             layoutParams = LinearLayout.LayoutParams(
