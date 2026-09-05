@@ -6,7 +6,9 @@ enum class Action(val id: String, val title: String) {
     NONE("none", "None"),
     BACK("back", "Back"),
     VOLUME_PANEL("volume_panel", "Open Volume Panel"),
-    NOTIFICATIONS("notifications", "Open Notification Panel");
+    NOTIFICATIONS("notifications", "Open Notification Panel"),
+    TOGGLE_RINGER("toggle_ringer", "Toggle Ringer (Sound / Vibrate)"),
+    SMART_SIDEBAR("smart_sidebar", "Open Smart Sidebar (Vivo)");
 
     companion object {
         fun fromId(id: String?): Action = entries.firstOrNull { it.id == id } ?: NONE
@@ -83,12 +85,14 @@ object Prefs {
             when (dir) {
                 "straight" -> Action.BACK
                 "down" -> Action.VOLUME_PANEL
+                "up" -> Action.SMART_SIDEBAR
                 else -> Action.NONE
             }
         } else {
             // long swipe
             when (dir) {
                 "down" -> Action.NOTIFICATIONS
+                "straight" -> Action.TOGGLE_RINGER
                 else -> Action.NONE
             }
         }
