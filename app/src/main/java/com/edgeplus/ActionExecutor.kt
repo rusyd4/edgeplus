@@ -154,6 +154,40 @@ object ActionExecutor {
         }.start()
     }
 
+    fun startScreenRecording(context: Context) {
+        val intentsToTry = listOf(
+            // Vivo / OriginOS S-Capture broadcasts & activities
+            Intent("com.vivo.smartshot.action.START_RECORD_SCREEN").apply {
+                setPackage("com.vivo.smartshot")
+                addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            },
+            Intent().apply {
+                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.ScreenRecordService")
+            },
+            Intent().apply {
+                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.FloatWindowService")
+            },
+            Intent("android.intent.action.MAIN").apply {
+                setClassName("com.vivo.smartshot", "com.vivo.smartshot.ui.ScreenRecordActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+
+        for (intent in intentsToTry) {
+            try {
+                if (intent.component?.className?.contains("Service") == true) {
+                    context.startService(intent)
+                    return
+                } else if (intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0) {
+                    context.startActivity(intent)
+                    return
+                } else {
+                    context.sendBroadcast(intent)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
     fun triggerBack() {
         Thread {
             try {
@@ -185,6 +219,7 @@ object ActionExecutor {
             Action.VOLUME_PANEL -> openVolumePanel(context)
             Action.NOTIFICATIONS -> openNotificationPanel(context)
             Action.TOGGLE_RINGER -> toggleRingerMode(context)
+            Action.SCREEN_RECORD -> startScreenRecording(context)
             Action.BRIGHTNESS_SLIDER -> {} // Handled interactively during drag in EdgeService
         }
     }
