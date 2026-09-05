@@ -12,6 +12,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 
@@ -38,11 +39,12 @@ class MainActivity : Activity() {
         val overlayBtn = Button(this).apply {
             text = "Grant Overlay Permission"
             setOnClickListener {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
                 )
-                startActivity(intent)
             }
         }
         layout.addView(overlayBtn)
@@ -82,6 +84,41 @@ class MainActivity : Activity() {
         serviceControlLayout.addView(stopBtn)
         layout.addView(serviceControlLayout)
 
+        // Handle appearance & sizing section
+        layout.addView(createSectionHeader("Handle Size & Visibility"))
+        buildSlider(
+            parent = layout,
+            title = "Handle Width (dp)",
+            current = Prefs.getHandleWidthDp(this),
+            min = 10,
+            max = 60
+        ) { value ->
+            Prefs.setHandleWidthDp(this, value)
+            reloadService()
+        }
+
+        buildSlider(
+            parent = layout,
+            title = "Handle Height (% of screen, 100 = full)",
+            current = Prefs.getHandleHeightPercent(this),
+            min = 20,
+            max = 100
+        ) { value ->
+            Prefs.setHandleHeightPercent(this, value)
+            reloadService()
+        }
+
+        buildSlider(
+            parent = layout,
+            title = "Handle Transparency (0 = invisible, 100 = solid)",
+            current = Prefs.getHandleAlphaPercent(this),
+            min = 0,
+            max = 100
+        ) { value ->
+            Prefs.setHandleAlphaPercent(this, value)
+            reloadService()
+        }
+
         // Gesture settings sections
         layout.addView(createSectionHeader("Right Handle Gestures"))
         buildGestureGroup(layout, side = "right", type = "short", labelPrefix = "Short Swipe")
@@ -94,6 +131,13 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
+    private fun reloadService() {
+        val intent = Intent(this, EdgeService::class.java).apply {
+            action = EdgeService.ACTION_RELOAD
+        }
+        startService(intent)
+    }
+
     private fun createSectionHeader(title: String): TextView {
         return TextView(this).apply {
             text = title
@@ -101,6 +145,43 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 32, 0, 16)
         }
+    }
+
+    private fun buildSlider(
+        parent: LinearLayout,
+        title: String,
+        current: Int,
+        min: Int,
+        max: Int,
+        onChanged: (Int) -> Unit
+    ) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 8, 0, 16)
+        }
+        val label = TextView(this).apply {
+            text = "$title: $current"
+            textSize = 14f
+        }
+        row.addView(label)
+
+        val seekBar = SeekBar(this).apply {
+            this.max = max - min
+            progress = current - min
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(p0: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val value = progress + min
+                    label.text = "$title: $value"
+                    if (fromUser) {
+                        onChanged(value)
+                    }
+                }
+                override fun onStartTrackingTouch(p0: SeekBar?) {}
+                override fun onStopTrackingTouch(p0: SeekBar?) {}
+            })
+        }
+        row.addView(seekBar)
+        parent.addView(row)
     }
 
     private fun buildGestureGroup(

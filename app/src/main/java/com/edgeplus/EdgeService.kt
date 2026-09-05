@@ -13,8 +13,8 @@ import android.os.Vibrator
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
-import kotlin.math.abs
 
 class EdgeService : Service() {
 
@@ -29,15 +29,45 @@ class EdgeService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        reloadHandles()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RELOAD) {
+            reloadHandles()
+        }
+        return START_STICKY
+    }
+
+    private fun removeHandles() {
+        rightHandle?.let { windowManager?.removeView(it) }
+        leftHandle?.let { windowManager?.removeView(it) }
+        rightHandle = null
+        leftHandle = null
+    }
+
+    private fun reloadHandles() {
+        removeHandles()
         leftHandle = createHandle(isRight = false)
         rightHandle = createHandle(isRight = true)
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun createHandle(isRight: Boolean): View {
-        val density = resources.displayMetrics.density
-        val widthPx = (24 * density).toInt()
-        val heightPx = (220 * density).toInt()
+        val dm = resources.displayMetrics
+        val density = dm.density
+        val screenHeight = dm.heightPixels
+
+        val widthDp = Prefs.getHandleWidthDp(this)
+        val heightPercent = Prefs.getHandleHeightPercent(this)
+        val alphaPercent = Prefs.getHandleAlphaPercent(this)
+
+        val widthPx = (widthDp * density).toInt().coerceAtLeast(10)
+        val heightPx = if (heightPercent >= 100) {
+            ViewGroup.LayoutParams.MATCH_PARENT
+        } else {
+            (screenHeight * (heightPercent / 100f)).toInt()
+        }
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -52,14 +82,16 @@ class EdgeService : Service() {
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = (if (isRight) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
         }
 
+        val alphaVal = ((alphaPercent / 100f) * 255).toInt().coerceIn(0, 255)
         val handle = View(this).apply {
-            setBackgroundColor(Color.argb(40, 0, 150, 255))
+            setBackgroundColor(Color.argb(alphaVal, 0, 150, 255))
             setOnTouchListener(object : View.OnTouchListener {
                 private var startX = 0f
                 private var startY = 0f
@@ -76,7 +108,7 @@ class EdgeService : Service() {
                         MotionEvent.ACTION_MOVE -> {
                             val dx = event.rawX - startX
                             val inwardDist = if (isRight) -dx else dx
-                            val longSwipeDistPx = 160 * density
+                            val longSwipeDistPx = 150 * density
                             if (inwardDist >= longSwipeDistPx && !hasVibratedLong) {
                                 hasVibratedLong = true
                                 vibrate()
@@ -101,8 +133,8 @@ class EdgeService : Service() {
 
     private fun evaluateGesture(isRight: Boolean, dx: Float, dy: Float, density: Float) {
         val inwardDist = if (isRight) -dx else dx
-        val minSwipeDistPx = 40 * density
-        val longSwipeDistPx = 160 * density
+        val minSwipeDistPx = 30 * density
+        val longSwipeDistPx = 150 * density
 
         if (inwardDist < minSwipeDistPx) {
             return
@@ -111,7 +143,6 @@ class EdgeService : Service() {
         val type = if (inwardDist >= longSwipeDistPx) "long" else "short"
         val side = if (isRight) "right" else "left"
 
-        // Direction: diagonal up, diagonal down, straight inward
         val diagonalThresholdPx = 40 * density
         val dir = when {
             dy < -diagonalThresholdPx -> "up"
@@ -134,9 +165,10 @@ class EdgeService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        rightHandle?.let { windowManager?.removeView(it) }
-        leftHandle?.let { windowManager?.removeView(it) }
-        rightHandle = null
-        leftHandle = null
+        removeHandles()
+    }
+
+    companion object {
+        const val ACTION_RELOAD = "com.edgeplus.ACTION_RELOAD"
     }
 }
