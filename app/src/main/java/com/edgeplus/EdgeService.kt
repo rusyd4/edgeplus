@@ -31,9 +31,6 @@ class EdgeService : Service() {
     // Brightness indicator overlay
     private var brightnessView: TextView? = null
 
-    // Quick tools overlay
-    private var quickToolsView: View? = null
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -54,7 +51,6 @@ class EdgeService : Service() {
         rightHandle?.let { windowManager?.removeView(it) }
         leftHandle?.let { windowManager?.removeView(it) }
         hideBrightnessIndicator()
-        hideQuickTools()
         rightHandle = null
         leftHandle = null
     }
@@ -260,12 +256,7 @@ class EdgeService : Service() {
 
         val action = Prefs.getAction(this, side, type, dir)
         android.util.Log.e("EdgePlus_Touch", "Gesture trigger: side=$side type=$type dir=$dir action=$action")
-
-        if (action == Action.QUICK_TOOLS) {
-            showQuickTools(isRight)
-        } else {
-            ActionExecutor.execute(this, action)
-        }
+        ActionExecutor.execute(this, action)
     }
 
     private fun showBrightnessIndicator(percent: Int) {
@@ -308,110 +299,6 @@ class EdgeService : Service() {
     private fun hideBrightnessIndicator() {
         brightnessView?.let { windowManager?.removeView(it) }
         brightnessView = null
-    }
-
-    private fun showQuickTools(isRight: Boolean) {
-        if (quickToolsView != null) {
-            hideQuickTools()
-            return
-        }
-
-        val density = resources.displayMetrics.density
-        val card = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
-            background = GradientDrawable().apply {
-                setColor(Color.argb(240, 15, 23, 42)) // Slate-900 high alpha
-                cornerRadius = 24 * density
-                setStroke(2, Color.parseColor("#38BDF8"))
-            }
-        }
-
-        fun createToolButton(title: String, bgColor: String, onClick: () -> Unit): android.widget.Button {
-            return android.widget.Button(this).apply {
-                text = title
-                setTextColor(Color.WHITE)
-                textSize = 13f
-                typeface = Typeface.DEFAULT_BOLD
-                isAllCaps = false
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    (180 * density).toInt(),
-                    (44 * density).toInt()
-                ).apply {
-                    setMargins(0, (4 * density).toInt(), 0, (4 * density).toInt())
-                }
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor(bgColor))
-                    cornerRadius = 14 * density
-                }
-                setOnClickListener {
-                    onClick()
-                    hideQuickTools()
-                }
-            }
-        }
-
-        val title = TextView(this).apply {
-            text = "QUICK TOOLS"
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#38BDF8"))
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (8 * density).toInt())
-        }
-        card.addView(title)
-
-        card.addView(createToolButton("🔊 Volume Panel", "#0284C7") {
-            ActionExecutor.openVolumePanel(this)
-        })
-        card.addView(createToolButton("🔔 Notification Panel", "#0F766E") {
-            ActionExecutor.openNotificationPanel(this)
-        })
-        card.addView(createToolButton("🔕 Toggle Ringer", "#475569") {
-            ActionExecutor.toggleRingerMode(this)
-        })
-        card.addView(createToolButton("🔙 Back", "#334155") {
-            ActionExecutor.triggerBack()
-        })
-        card.addView(createToolButton("✕ Close Menu", "#1E293B") {
-            // just closes
-        })
-
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = (if (isRight) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
-            x = (20 * density).toInt()
-        }
-
-        card.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_OUTSIDE) {
-                hideQuickTools()
-                true
-            } else {
-                false
-            }
-        }
-
-        windowManager?.addView(card, params)
-        quickToolsView = card
-    }
-
-    private fun hideQuickTools() {
-        quickToolsView?.let { windowManager?.removeView(it) }
-        quickToolsView = null
     }
 
     private fun vibrateShort() {

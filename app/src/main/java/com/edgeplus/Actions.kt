@@ -8,8 +8,7 @@ enum class Action(val id: String, val title: String) {
     VOLUME_PANEL("volume_panel", "Open Volume Panel"),
     NOTIFICATIONS("notifications", "Open Notification Panel"),
     TOGGLE_RINGER("toggle_ringer", "Toggle Ringer (Sound / Vibrate)"),
-    BRIGHTNESS_SLIDER("brightness_slider", "Brightness Control (Drag Up/Down)"),
-    QUICK_TOOLS("quick_tools", "Quick Tools Menu (Floating)");
+    BRIGHTNESS_SLIDER("brightness_slider", "Brightness Control (Drag Up/Down)");
 
     companion object {
         fun fromId(id: String?): Action = entries.firstOrNull { it.id == id } ?: NONE
@@ -86,7 +85,7 @@ object Prefs {
             when (dir) {
                 "straight" -> Action.BACK
                 "down" -> Action.VOLUME_PANEL
-                "up" -> Action.QUICK_TOOLS
+                "up" -> Action.NONE
                 else -> Action.NONE
             }
         } else {
