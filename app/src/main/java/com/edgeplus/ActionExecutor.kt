@@ -3,7 +3,7 @@ package com.edgeplus
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
-import dev.rikka.shizuku.Shizuku
+import rikka.shizuku.Shizuku
 import java.io.OutputStream
 import java.util.concurrent.Executors
 

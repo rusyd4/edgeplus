@@ -20,6 +20,7 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import rikka.shizuku.Shizuku
 
 class MainActivity : Activity() {
 
