@@ -205,7 +205,7 @@ object ActionExecutor {
             Action.VOLUME_PANEL -> openVolumePanel(context)
             Action.NOTIFICATIONS -> openNotificationPanel(context)
             Action.TOGGLE_RINGER -> toggleRingerMode(context)
-            Action.BRIGHTNESS_SLIDER -> {} // Handled interactively during drag in EdgeService
+            Action.BRIGHTNESS_SLIDER, Action.QUICK_TOOLS -> {} // Handled in EdgeService
         }
     }
 }
