@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -16,6 +18,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.TextView
+import kotlin.math.roundToInt
 
 class EdgeService : Service() {
 
@@ -23,6 +27,9 @@ class EdgeService : Service() {
     private var rightHandle: View? = null
     private var leftHandle: View? = null
     private var vibrator: Vibrator? = null
+
+    // Brightness indicator overlay
+    private var brightnessView: TextView? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -43,6 +50,7 @@ class EdgeService : Service() {
     private fun removeHandles() {
         rightHandle?.let { windowManager?.removeView(it) }
         leftHandle?.let { windowManager?.removeView(it) }
+        hideBrightnessIndicator()
         rightHandle = null
         leftHandle = null
     }
@@ -105,12 +113,12 @@ class EdgeService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = (if (isRight) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
-            // Request 120Hz+ high refresh rate on Android 6.0+
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         display
                     } else {
+                        @Suppress("DEPRECATION")
                         windowManager?.defaultDisplay
                     }
                     val modeId = findHighestRefreshRateModeId(display)
@@ -118,7 +126,6 @@ class EdgeService : Service() {
                         preferredDisplayModeId = modeId
                     }
                 }
-                // Request 120Hz on Android 11+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     preferredRefreshRate = 120f
                 }
@@ -133,6 +140,9 @@ class EdgeService : Service() {
                 private var startY = 0f
                 private var hasVibratedShort = false
                 private var hasVibratedLong = false
+                private var isDraggingBrightness = false
+                private var initialBrightness = 128
+                private var lastReportedPercent = -1
 
                 override fun onTouch(v: View?, event: MotionEvent): Boolean {
                     when (event.actionMasked) {
@@ -141,15 +151,32 @@ class EdgeService : Service() {
                             startY = event.rawY
                             hasVibratedShort = false
                             hasVibratedLong = false
+                            isDraggingBrightness = false
+                            lastReportedPercent = -1
                             return true
                         }
                         MotionEvent.ACTION_MOVE -> {
                             val dx = event.rawX - startX
+                            val dy = event.rawY - startY
                             val inwardDist = if (isRight) -dx else dx
                             val shortSwipeDistPx = 30 * density
                             val longSwipeDistPx = 150 * density
 
-                            // Trigger short swipe haptic upon crossing short threshold
+                            if (isDraggingBrightness) {
+                                // Real-time drag adjusting brightness: drag up = brighter, drag down = darker
+                                val dragY = -dy // Invert so dragging upwards increases
+                                val deltaFraction = dragY / (300f * density)
+                                val newBrightness = (initialBrightness + (deltaFraction * 255)).roundToInt().coerceIn(1, 255)
+                                ActionExecutor.setBrightness(this@EdgeService, newBrightness)
+
+                                val percent = ((newBrightness / 255f) * 100).roundToInt()
+                                if (percent != lastReportedPercent) {
+                                    lastReportedPercent = percent
+                                    showBrightnessIndicator(percent)
+                                }
+                                return true
+                            }
+
                             if (inwardDist >= shortSwipeDistPx && !hasVibratedShort) {
                                 hasVibratedShort = true
                                 if (Prefs.isVibrateOnShortSwipe(this@EdgeService)) {
@@ -157,14 +184,29 @@ class EdgeService : Service() {
                                 }
                             }
 
-                            // Trigger long swipe haptic upon crossing long threshold
                             if (inwardDist >= longSwipeDistPx && !hasVibratedLong) {
                                 hasVibratedLong = true
                                 vibrateLong()
+
+                                // Check if the long-swipe action for this direction is BRIGHTNESS_SLIDER
+                                val side = if (isRight) "right" else "left"
+                                val dir = getDirection(dy, density)
+                                val assignedAction = Prefs.getAction(this@EdgeService, side, "long", dir)
+                                if (assignedAction == Action.BRIGHTNESS_SLIDER) {
+                                    isDraggingBrightness = true
+                                    initialBrightness = ActionExecutor.getCurrentBrightness(this@EdgeService)
+                                    val percent = ((initialBrightness / 255f) * 100).roundToInt()
+                                    showBrightnessIndicator(percent)
+                                }
                             }
                             return true
                         }
                         MotionEvent.ACTION_UP -> {
+                            if (isDraggingBrightness) {
+                                isDraggingBrightness = false
+                                hideBrightnessIndicator()
+                                return true
+                            }
                             val dx = event.rawX - startX
                             val dy = event.rawY - startY
                             evaluateGesture(isRight, dx, dy, density)
@@ -180,6 +222,15 @@ class EdgeService : Service() {
         return handle
     }
 
+    private fun getDirection(dy: Float, density: Float): String {
+        val diagonalThresholdPx = 40 * density
+        return when {
+            dy < -diagonalThresholdPx -> "up"
+            dy > diagonalThresholdPx -> "down"
+            else -> "straight"
+        }
+    }
+
     private fun evaluateGesture(isRight: Boolean, dx: Float, dy: Float, density: Float) {
         val inwardDist = if (isRight) -dx else dx
         val minSwipeDistPx = 30 * density
@@ -191,18 +242,52 @@ class EdgeService : Service() {
 
         val type = if (inwardDist >= longSwipeDistPx) "long" else "short"
         val side = if (isRight) "right" else "left"
-
-        val diagonalThresholdPx = 40 * density
-        val dir = when {
-            dy < -diagonalThresholdPx -> "up"
-            dy > diagonalThresholdPx -> "down"
-            else -> "straight"
-        }
+        val dir = getDirection(dy, density)
 
         val action = Prefs.getAction(this, side, type, dir)
-        if (action != Action.NONE) {
-            ActionExecutor.execute(this, action)
+        ActionExecutor.execute(this, action)
+    }
+
+    private fun showBrightnessIndicator(percent: Int) {
+        if (brightnessView == null) {
+            val density = resources.displayMetrics.density
+            val tv = TextView(this).apply {
+                textSize = 18f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding((24 * density).toInt(), (14 * density).toInt(), (24 * density).toInt(), (14 * density).toInt())
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(220, 15, 23, 42)) // Slate-900 with high opacity
+                    cornerRadius = 20 * density
+                    setStroke(2, Color.parseColor("#38BDF8"))
+                }
+            }
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+            windowManager?.addView(tv, params)
+            brightnessView = tv
         }
+        brightnessView?.text = "Brightness: $percent%"
+    }
+
+    private fun hideBrightnessIndicator() {
+        brightnessView?.let { windowManager?.removeView(it) }
+        brightnessView = null
     }
 
     private fun vibrateShort() {

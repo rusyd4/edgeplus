@@ -4,9 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioManager
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import kotlin.math.roundToInt
 
 object ActionExecutor {
 
@@ -26,7 +28,6 @@ object ActionExecutor {
                     am.ringerMode = AudioManager.RINGER_MODE_NORMAL
                 }
             }
-            // Show UI confirmation via volume panel flag
             am.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
         } catch (e: Throwable) {
             android.util.Log.e("ActionExecutor", "Failed to toggle ringer mode", e)
@@ -45,6 +46,23 @@ object ActionExecutor {
         }
     }
 
+    fun getCurrentBrightness(context: Context): Int {
+        return try {
+            Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+        } catch (_: Throwable) {
+            128
+        }
+    }
+
+    fun setBrightness(context: Context, value: Int) {
+        try {
+            val clamped = value.coerceIn(1, 255)
+            Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, clamped)
+        } catch (e: Throwable) {
+            android.util.Log.e("ActionExecutor", "Failed to write brightness", e)
+        }
+    }
+
     fun openSmartSidebar(context: Context) {
         Thread {
             try {
@@ -56,7 +74,6 @@ object ActionExecutor {
                 val dm = context.resources.displayMetrics
                 val screenWidth = dm.widthPixels.toFloat()
 
-                // Target the Vivo side_dock_gesture_bar touch area (X: edge, Y: center-top)
                 val startX = screenWidth - 2f
                 val endX = screenWidth - (120f * dm.density)
                 val y = 480f * (dm.heightPixels / 2400f)
@@ -86,7 +103,6 @@ object ActionExecutor {
 
                 injectTouch(MotionEvent.ACTION_DOWN, startX, y, downTime)
 
-                // Drag inward and hold slightly to trigger Vivo's gesture dock threshold
                 for (i in 1..10) {
                     Thread.sleep(20)
                     val currTime = SystemClock.uptimeMillis()
@@ -94,7 +110,7 @@ object ActionExecutor {
                     injectTouch(MotionEvent.ACTION_MOVE, currX, y, currTime)
                 }
 
-                Thread.sleep(400) // Hold duration required by Vivo SideSlide
+                Thread.sleep(400)
                 val upTime = SystemClock.uptimeMillis()
                 injectTouch(MotionEvent.ACTION_UP, endX, y, upTime)
 
@@ -136,6 +152,7 @@ object ActionExecutor {
             Action.NOTIFICATIONS -> openNotificationPanel(context)
             Action.TOGGLE_RINGER -> toggleRingerMode(context)
             Action.SMART_SIDEBAR -> openSmartSidebar(context)
+            Action.BRIGHTNESS_SLIDER -> {} // Handled interactively during drag in EdgeService
         }
     }
 }

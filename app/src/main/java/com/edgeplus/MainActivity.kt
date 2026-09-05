@@ -25,6 +25,7 @@ class MainActivity : Activity() {
 
     private lateinit var statusCard: LinearLayout
     private lateinit var overlayBadge: TextView
+    private lateinit var writeSettingsBadge: TextView
     private lateinit var hzBadge: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,6 +88,7 @@ class MainActivity : Activity() {
         statusCard.addView(cardTitle)
 
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
+        writeSettingsBadge = createStatusRow(statusCard, "Write Settings (Brightness)")
         hzBadge = createStatusRow(statusCard, "Display Refresh Rate")
 
         // Quick Permission Action Buttons
@@ -106,7 +108,17 @@ class MainActivity : Activity() {
                 )
             )
         }
+        val writeSettingsBtn = createButton("Grant Brightness", "#0F766E") {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
         btnRow.addView(overlayBtn)
+        btnRow.addView(createSpacer(8))
+        btnRow.addView(writeSettingsBtn)
         statusCard.addView(btnRow)
 
         root.addView(statusCard)
@@ -397,6 +409,10 @@ class MainActivity : Activity() {
         val overlayOk = Settings.canDrawOverlays(this)
         overlayBadge.text = if (overlayOk) "GRANTED" else "MISSING"
         overlayBadge.setTextColor(Color.parseColor(if (overlayOk) "#4ADE80" else "#F87171"))
+
+        val writeSettingsOk = Settings.System.canWrite(this)
+        writeSettingsBadge.text = if (writeSettingsOk) "GRANTED" else "MISSING"
+        writeSettingsBadge.setTextColor(Color.parseColor(if (writeSettingsOk) "#4ADE80" else "#F87171"))
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
