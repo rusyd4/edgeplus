@@ -198,7 +198,7 @@ class EdgeService : Service() {
         }
 
         val action = Prefs.getAction(this, side, type, dir)
-        EdgeAccessibilityService.execute(this, action)
+        ActionExecutor.execute(this, action)
     }
 
     private fun vibrateShort() {

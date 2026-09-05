@@ -26,7 +26,12 @@ class MainActivity : Activity() {
     private lateinit var statusCard: LinearLayout
     private lateinit var overlayBadge: TextView
     private lateinit var a11yBadge: TextView
+    private lateinit var shizukuBadge: TextView
     private lateinit var hzBadge: TextView
+
+    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        updateStatus()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,14 +78,20 @@ class MainActivity : Activity() {
         }
         statusCard.addView(cardTitle)
 
+        shizukuBadge = createStatusRow(statusCard, "Shizuku Mode (No A11y)")
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
-        a11yBadge = createStatusRow(statusCard, "Accessibility Service")
+        a11yBadge = createStatusRow(statusCard, "Accessibility Fallback")
         hzBadge = createStatusRow(statusCard, "Display Refresh Rate")
 
         // Quick Permission Action Buttons
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 24, 0, 0)
+        }
+        val shizukuBtn = createButton("Auth Shizuku", "#0369A1") {
+            if (ActionExecutor.isShizukuAvailable()) {
+                ActionExecutor.requestShizukuPermission(1001)
+            }
         }
         val overlayBtn = createButton("Grant Overlay", "#1E293B") {
             startActivity(
@@ -90,11 +101,13 @@ class MainActivity : Activity() {
                 )
             )
         }
-        val a11yBtn = createButton("Enable A11y", "#1E293B") {
+        val a11yBtn = createButton("Fallback A11y", "#1E293B") {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        btnRow.addView(shizukuBtn)
+        btnRow.addView(createSpacer(8))
         btnRow.addView(overlayBtn)
-        btnRow.addView(createSpacer(16))
+        btnRow.addView(createSpacer(8))
         btnRow.addView(a11yBtn)
         statusCard.addView(btnRow)
 
@@ -333,18 +346,36 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (ActionExecutor.isShizukuAvailable()) {
+            Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
+        }
         updateStatus()
     }
 
+    override fun onPause() {
+        super.onPause()
+        if (ActionExecutor.isShizukuAvailable()) {
+            Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        }
+    }
+
     private fun updateStatus() {
+        val shizukuOk = ActionExecutor.hasShizukuPermission()
         val overlayOk = Settings.canDrawOverlays(this)
         val a11yOk = EdgeAccessibilityService.isRunning()
+
+        shizukuBadge.text = when {
+            shizukuOk -> "ACTIVE (SECURE)"
+            ActionExecutor.isShizukuAvailable() -> "UNAUTHORIZED"
+            else -> "NOT RUNNING"
+        }
+        shizukuBadge.setTextColor(Color.parseColor(if (shizukuOk) "#4ADE80" else "#F87171"))
 
         overlayBadge.text = if (overlayOk) "GRANTED" else "MISSING"
         overlayBadge.setTextColor(Color.parseColor(if (overlayOk) "#4ADE80" else "#F87171"))
 
-        a11yBadge.text = if (a11yOk) "RUNNING" else "STOPPED"
-        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#4ADE80" else "#F87171"))
+        a11yBadge.text = if (a11yOk) "ENABLED" else "DISABLED"
+        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#FBBF24" else "#94A3B8"))
 
         val currentRate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             display?.mode?.refreshRate ?: 60f
