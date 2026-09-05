@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.Display
 import android.view.View
+import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -37,11 +38,6 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Request 120Hz on MainActivity window
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.attributes.preferredRefreshRate = 120f
-        }
-
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#0F172A")) // Slate 900
         }
@@ -55,15 +51,15 @@ class MainActivity : Activity() {
         // App Header
         val titleText = TextView(this).apply {
             text = "EdgePlus"
-            textSize = 28f
+            textSize = 26f
             setTextColor(Color.parseColor("#F8FAFC"))
             typeface = Typeface.DEFAULT_BOLD
         }
         val subText = TextView(this).apply {
             text = "One Hand Operation + Alternative for iQOO"
-            textSize = 14f
+            textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
-            setPadding(0, 4, 0, 32)
+            setPadding(0, 4, 0, 24)
         }
         root.addView(titleText)
         root.addView(subText)
@@ -252,7 +248,10 @@ class MainActivity : Activity() {
     private fun createSpacer(sizeDp: Int): View {
         val px = (sizeDp * resources.displayMetrics.density).toInt()
         return View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(px, px)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                px
+            )
         }
     }
 
@@ -322,12 +321,34 @@ class MainActivity : Activity() {
 
             val spinner = Spinner(this).apply {
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#0F172A"))
+                    setColor(Color.parseColor("#1E293B"))
                     cornerRadius = 12f
                     setStroke(2, Color.parseColor("#334155"))
                 }
             }
-            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, actionTitles)
+            val adapter = object : ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                actionTitles
+            ) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val v = super.getView(position, convertView, parent)
+                    (v as? TextView)?.apply {
+                        setTextColor(Color.parseColor("#F8FAFC"))
+                        textSize = 14f
+                    }
+                    return v
+                }
+
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val v = super.getDropDownView(position, convertView, parent)
+                    (v as? TextView)?.apply {
+                        setTextColor(Color.parseColor("#0F172A"))
+                        textSize = 14f
+                    }
+                    return v
+                }
+            }
             spinner.adapter = adapter
 
             val currentAction = Prefs.getAction(this, side, type, dir)
@@ -378,11 +399,15 @@ class MainActivity : Activity() {
         a11yBadge.text = if (a11yOk) "ENABLED" else "DISABLED"
         a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#FBBF24" else "#94A3B8"))
 
-        val currentRate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display?.mode?.refreshRate ?: 60f
-        } else {
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.refreshRate
+        val currentRate = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display?.mode?.refreshRate ?: 60f
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay.refreshRate
+            }
+        } catch (_: Throwable) {
+            60f
         }
         hzBadge.text = "${currentRate.toInt()} Hz"
         hzBadge.setTextColor(Color.parseColor("#38BDF8"))
