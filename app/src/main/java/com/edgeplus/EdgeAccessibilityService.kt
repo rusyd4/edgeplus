@@ -37,6 +37,11 @@ class EdgeAccessibilityService : AccessibilityService() {
             return instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) ?: false
         }
 
+        fun openVolumePanel(context: Context) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            audioManager?.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
+        }
+
         fun execute(context: Context, action: Action) {
             when (action) {
                 Action.NONE -> {}
