@@ -106,21 +106,23 @@ class EdgeService : Service() {
         ).apply {
             gravity = (if (isRight) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
             // Request 120Hz+ high refresh rate on Android 6.0+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    display
-                } else {
-                    windowManager?.defaultDisplay
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        display
+                    } else {
+                        windowManager?.defaultDisplay
+                    }
+                    val modeId = findHighestRefreshRateModeId(display)
+                    if (modeId > 0) {
+                        preferredDisplayModeId = modeId
+                    }
                 }
-                val modeId = findHighestRefreshRateModeId(display)
-                if (modeId > 0) {
-                    preferredDisplayModeId = modeId
+                // Request 120Hz on Android 11+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    preferredRefreshRate = 120f
                 }
-            }
-            // Request 120Hz on Android 11+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                preferredRefreshRate = 120f
-            }
+            } catch (_: Throwable) {}
         }
 
         val alphaVal = ((alphaPercent / 100f) * 255).toInt().coerceIn(0, 255)

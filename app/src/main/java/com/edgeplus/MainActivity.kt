@@ -401,10 +401,10 @@ class MainActivity : Activity() {
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                display?.mode?.refreshRate ?: 60f
+                this.display?.mode?.refreshRate ?: 60f
             } else {
                 @Suppress("DEPRECATION")
-                windowManager.defaultDisplay.refreshRate
+                windowManager?.defaultDisplay?.refreshRate ?: 60f
             }
         } catch (_: Throwable) {
             60f
