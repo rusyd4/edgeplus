@@ -68,7 +68,7 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         }
         val subText = TextView(this).apply {
-            text = "Assistive Floating Button & Floating Apps"
+            text = "Assistive Floating Button (OHO+ Style)"
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             setPadding(0, 4, 0, 24)

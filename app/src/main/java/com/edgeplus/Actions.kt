@@ -17,6 +17,7 @@ enum class Gesture(val id: String, val title: String) {
 
 enum class Action(val id: String, val title: String) {
     NONE("none", "None"),
+    SWITCH_SIDE("switch_side", "Move to Opposite Edge (Pindah Seberang)"),
     NOTIFICATIONS("notifications", "Open Notification Panel"),
     QUICK_PANEL("quick_panel", "Open Quick Settings"),
     VOLUME_UP("volume_up", "Volume Up"),
@@ -25,7 +26,6 @@ enum class Action(val id: String, val title: String) {
     SCREEN_OFF("screen_off", "Turn Off Screen (Fingerprint OK)"),
     SCREENSHOT("screenshot", "Take Screenshot"),
     SCREEN_RECORD("screen_record", "Start Screen Recording"),
-    APP_LAUNCHER("app_launcher", "Open App Launcher (Floating Window)"),
     BACK("back", "Back"),
     HOME("home", "Home"),
     RECENTS("recents", "Recent Apps");

@@ -3,11 +3,14 @@ package com.edgeplus
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Service
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -28,22 +31,41 @@ import kotlin.math.sqrt
 class FloatingService : Service() {
 
     private var windowManager: WindowManager? = null
+    private var displayManager: DisplayManager? = null
     private var buttonView: View? = null
+    private var windowParams: WindowManager.LayoutParams? = null
     private var vibrator: Vibrator? = null
-    private var appLauncherOverlay: AppLauncherOverlay? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var tapCount = 0
     private var tapRunnable: Runnable? = null
     private var longPressRunnable: Runnable? = null
 
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            repositionButtonForCurrentOrientation()
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        displayManager = getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        appLauncherOverlay = AppLauncherOverlay(this)
+
+        displayManager?.registerDisplayListener(displayListener, mainHandler)
+        registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: Configuration) {
+                repositionButtonForCurrentOrientation()
+            }
+            override fun onLowMemory() {}
+            override fun onTrimMemory(level: Int) {}
+        })
+
         createFloatingButton()
     }
 
@@ -55,12 +77,45 @@ class FloatingService : Service() {
         return START_STICKY
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        repositionButtonForCurrentOrientation()
+    }
+
+    private fun repositionButtonForCurrentOrientation() {
+        val view = buttonView ?: return
+        val params = windowParams ?: return
+
+        val screenWidth: Int
+        val screenHeight: Int
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && windowManager != null) {
+            val bounds = windowManager!!.currentWindowMetrics.bounds
+            screenWidth = bounds.width()
+            screenHeight = bounds.height()
+        } else {
+            val dm = resources.displayMetrics
+            screenWidth = dm.widthPixels
+            screenHeight = dm.heightPixels
+        }
+
+        val sizePx = params.width
+        val isRight = Prefs.isAttachedRight(this)
+        val yPct = Prefs.getLastPositionYPercent(this)
+
+        params.x = if (isRight) screenWidth - sizePx else 0
+        params.y = ((screenHeight - sizePx) * yPct).toInt().coerceIn(30, (screenHeight - sizePx - 30).coerceAtLeast(30))
+
+        try {
+            windowManager?.updateViewLayout(view, params)
+        } catch (_: Throwable) {}
+    }
+
     private fun removeFloatingButton() {
         buttonView?.let {
             try { windowManager?.removeView(it) } catch (_: Throwable) {}
         }
         buttonView = null
-        appLauncherOverlay?.hide()
+        windowParams = null
     }
 
     @Suppress("DEPRECATION")
@@ -93,7 +148,7 @@ class FloatingService : Service() {
 
         val isRight = Prefs.isAttachedRight(this)
         val yPct = Prefs.getLastPositionYPercent(this)
-        val initialY = ((screenHeight - sizePx) * yPct).toInt().coerceIn(100, screenHeight - sizePx - 100)
+        val initialY = ((screenHeight - sizePx) * yPct).toInt().coerceIn(50, (screenHeight - sizePx - 50).coerceAtLeast(50))
         val initialX = if (isRight) screenWidth - sizePx else 0
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -131,8 +186,8 @@ class FloatingService : Service() {
                 }
             } catch (_: Throwable) {}
         }
+        windowParams = params
 
-        // Circular Floating Button View
         val outerContainer = FrameLayout(this)
         val innerCircle = View(this).apply {
             layoutParams = FrameLayout.LayoutParams(sizePx, sizePx)
@@ -144,7 +199,6 @@ class FloatingService : Service() {
             alpha = idleAlphaPercent / 100f
         }
 
-        // Center visual cue dot
         val centerDot = View(this).apply {
             val dotSize = (10 * density).toInt()
             layoutParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
@@ -170,6 +224,18 @@ class FloatingService : Service() {
             private var isDragging = false
 
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
+                val curScreenWidth: Int
+                val curScreenHeight: Int
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && windowManager != null) {
+                    val bounds = windowManager!!.currentWindowMetrics.bounds
+                    curScreenWidth = bounds.width()
+                    curScreenHeight = bounds.height()
+                } else {
+                    val dm = resources.displayMetrics
+                    curScreenWidth = dm.widthPixels
+                    curScreenHeight = dm.heightPixels
+                }
+
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         startRawX = event.rawX
@@ -180,14 +246,12 @@ class FloatingService : Service() {
 
                         innerCircle.alpha = 0.95f
 
-                        // Long press timer to enter drag mode
                         longPressRunnable = Runnable {
                             isDragging = true
                             vibrateTick(heavy = true)
-                            // Visual feedback for drag readiness
                             innerCircle.animate().scaleX(1.15f).scaleY(1.15f).setDuration(120).start()
                         }
-                        mainHandler.postDelayed(longPressRunnable!!, 320)
+                        mainHandler.postDelayed(longPressRunnable!!, 300)
                         return true
                     }
 
@@ -197,12 +261,11 @@ class FloatingService : Service() {
                         val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 
                         if (isDragging) {
-                            params.x = (initialWindowX + dx).toInt().coerceIn(0, screenWidth - sizePx)
-                            params.y = (initialWindowY + dy).toInt().coerceIn(0, screenHeight - sizePx)
+                            params.x = (initialWindowX + dx).toInt().coerceIn(0, curScreenWidth - sizePx)
+                            params.y = (initialWindowY + dy).toInt().coerceIn(0, curScreenHeight - sizePx)
                             try { windowManager?.updateViewLayout(outerContainer, params) } catch (_: Throwable) {}
                         } else {
                             if (dist > touchSlop) {
-                                // User started swiping before drag triggered -> cancel drag
                                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
                             }
                         }
@@ -220,10 +283,9 @@ class FloatingService : Service() {
 
                         if (isDragging) {
                             isDragging = false
-                            // Snap to nearest edge (left or right)
                             val currentCenterX = params.x + (sizePx / 2)
-                            val snapRight = currentCenterX >= (screenWidth / 2)
-                            val targetX = if (snapRight) screenWidth - sizePx else 0
+                            val snapRight = currentCenterX >= (curScreenWidth / 2)
+                            val targetX = if (snapRight) curScreenWidth - sizePx else 0
 
                             ValueAnimator.ofInt(params.x, targetX).apply {
                                 duration = 220
@@ -236,23 +298,22 @@ class FloatingService : Service() {
                             }
 
                             Prefs.setAttachedRight(this@FloatingService, snapRight)
-                            val finalYPercent = params.y.toFloat() / (screenHeight - sizePx).coerceAtLeast(1)
+                            val finalYPercent = params.y.toFloat() / (curScreenHeight - sizePx).coerceAtLeast(1)
                             Prefs.setLastPositionYPercent(this@FloatingService, finalYPercent)
                             vibrateTick(heavy = false)
                         } else {
+                            val density = resources.displayMetrics.density
                             val swipeThreshold = 28 * density
                             val currentIsRight = Prefs.isAttachedRight(this@FloatingService)
                             val inwardDist = if (currentIsRight) -dx else dx
 
                             if (dist >= swipeThreshold) {
-                                // Gesture swipe on button
                                 if (abs(dy) >= swipeThreshold && abs(dy) > inwardDist) {
                                     if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
                                 } else if (inwardDist >= swipeThreshold) {
                                     dispatchGesture(Gesture.SWIPE_INWARD)
                                 }
                             } else {
-                                // Tap detection (single, double, triple)
                                 registerTap()
                             }
                         }
@@ -267,6 +328,34 @@ class FloatingService : Service() {
             windowManager?.addView(outerContainer, params)
             buttonView = outerContainer
         } catch (_: Throwable) {}
+    }
+
+    fun moveToOppositeSide() {
+        val params = windowParams ?: return
+        val view = buttonView ?: return
+
+        val screenWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && windowManager != null) {
+            windowManager!!.currentWindowMetrics.bounds.width()
+        } else {
+            resources.displayMetrics.widthPixels
+        }
+        val sizePx = params.width
+        val currentIsRight = Prefs.isAttachedRight(this)
+        val newIsRight = !currentIsRight
+        val targetX = if (newIsRight) screenWidth - sizePx else 0
+
+        ValueAnimator.ofInt(params.x, targetX).apply {
+            duration = 260
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { va ->
+                params.x = va.animatedValue as Int
+                try { windowManager?.updateViewLayout(view, params) } catch (_: Throwable) {}
+            }
+            start()
+        }
+
+        Prefs.setAttachedRight(this, newIsRight)
+        vibrateTick(heavy = false)
     }
 
     private fun registerTap() {
@@ -299,8 +388,10 @@ class FloatingService : Service() {
             vibrateTick(heavy = false)
         }
 
-        ActionExecutor.execute(this, action) {
-            appLauncherOverlay?.show()
+        if (action == Action.SWITCH_SIDE) {
+            moveToOppositeSide()
+        } else {
+            ActionExecutor.execute(this, action)
         }
     }
 
