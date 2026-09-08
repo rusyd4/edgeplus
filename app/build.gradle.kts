@@ -11,8 +11,8 @@ android {
         applicationId = "com.edgeplus"
         minSdk = 28
         targetSdk = 35
-        versionCode = 27
-        versionName = "3.2.0"
+        versionCode = 28
+        versionName = "3.2.1"
     }
 
     lint {
