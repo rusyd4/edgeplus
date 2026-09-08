@@ -2,13 +2,33 @@ package com.edgeplus
 
 import android.content.Context
 
+enum class Gesture(val id: String, val title: String) {
+    SINGLE_TAP("single_tap", "Single Tap"),
+    DOUBLE_TAP("double_tap", "Double Tap"),
+    TRIPLE_TAP("triple_tap", "Triple Tap"),
+    SWIPE_UP("swipe_up", "Swipe Up"),
+    SWIPE_DOWN("swipe_down", "Swipe Down"),
+    SWIPE_INWARD("swipe_inward", "Swipe Inward");
+
+    companion object {
+        fun fromId(id: String?): Gesture = entries.firstOrNull { it.id == id } ?: SINGLE_TAP
+    }
+}
+
 enum class Action(val id: String, val title: String) {
     NONE("none", "None"),
-    BACK("back", "Back"),
-    VOLUME_PANEL("volume_panel", "Open Volume Panel"),
     NOTIFICATIONS("notifications", "Open Notification Panel"),
-    TOGGLE_RINGER("toggle_ringer", "Toggle Ringer (Sound / Vibrate)"),
-    BRIGHTNESS_SLIDER("brightness_slider", "Brightness Control (Drag Up/Down)");
+    QUICK_PANEL("quick_panel", "Open Quick Settings"),
+    VOLUME_UP("volume_up", "Volume Up"),
+    VOLUME_DOWN("volume_down", "Volume Down"),
+    VOLUME_PANEL("volume_panel", "Open Volume Panel"),
+    SCREEN_OFF("screen_off", "Turn Off Screen (Fingerprint OK)"),
+    SCREENSHOT("screenshot", "Take Screenshot"),
+    SCREEN_RECORD("screen_record", "Start Screen Recording"),
+    APP_LAUNCHER("app_launcher", "Open App Launcher (Floating Window)"),
+    BACK("back", "Back"),
+    HOME("home", "Home"),
+    RECENTS("recents", "Recent Apps");
 
     companion object {
         fun fromId(id: String?): Action = entries.firstOrNull { it.id == id } ?: NONE
@@ -18,84 +38,88 @@ enum class Action(val id: String, val title: String) {
 object Prefs {
     private const val PREFS_NAME = "edgeplus_prefs"
 
-    fun getAction(context: Context, side: String, type: String, dir: String): Action {
+    fun getAction(context: Context, gesture: Gesture): Action {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val defaultAction = defaultActionFor(side, type, dir)
-        val raw = prefs.getString("${side}_${type}_${dir}", defaultAction.id)
+        val defaultAction = defaultActionFor(gesture)
+        val raw = prefs.getString("gesture_${gesture.id}", defaultAction.id)
         return Action.fromId(raw)
     }
 
-    fun setAction(context: Context, side: String, type: String, dir: String, action: Action) {
+    fun setAction(context: Context, gesture: Gesture, action: Action) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putString("${side}_${type}_${dir}", action.id)
+            .putString("gesture_${gesture.id}", action.id)
             .apply()
     }
 
-    fun getHandleWidthDp(context: Context): Int {
+    fun getButtonSizeDp(context: Context): Int {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt("handle_width_dp", 24)
+            .getInt("button_size_dp", 52)
     }
 
-    fun setHandleWidthDp(context: Context, width: Int) {
+    fun setButtonSizeDp(context: Context, size: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putInt("handle_width_dp", width)
+            .putInt("button_size_dp", size)
             .apply()
     }
 
-    fun getHandleHeightPercent(context: Context): Int {
+    fun getButtonAlphaIdle(context: Context): Int {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt("handle_height_percent", 100)
+            .getInt("button_alpha_idle", 55)
     }
 
-    fun setHandleHeightPercent(context: Context, percent: Int) {
+    fun setButtonAlphaIdle(context: Context, alpha: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putInt("handle_height_percent", percent)
+            .putInt("button_alpha_idle", alpha)
             .apply()
     }
 
-    fun getHandleAlphaPercent(context: Context): Int {
+    fun getLastPositionYPercent(context: Context): Float {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt("handle_alpha_percent", 10)
+            .getFloat("button_pos_y_pct", 0.5f)
     }
 
-    fun setHandleAlphaPercent(context: Context, alpha: Int) {
+    fun setLastPositionYPercent(context: Context, yPct: Float) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putInt("handle_alpha_percent", alpha)
+            .putFloat("button_pos_y_pct", yPct)
             .apply()
     }
 
-    fun isVibrateOnShortSwipe(context: Context): Boolean {
+    fun isAttachedRight(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean("vibrate_short", true)
+            .getBoolean("button_is_right", true)
     }
 
-    fun setVibrateOnShortSwipe(context: Context, enabled: Boolean) {
+    fun setAttachedRight(context: Context, isRight: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean("vibrate_short", enabled)
+            .putBoolean("button_is_right", isRight)
             .apply()
     }
 
-    private fun defaultActionFor(side: String, type: String, dir: String): Action {
-        return if (type == "short") {
-            when (dir) {
-                "straight" -> Action.BACK
-                "down" -> Action.VOLUME_PANEL
-                "up" -> Action.NONE
-                else -> Action.NONE
-            }
-        } else {
-            // long swipe
-            when (dir) {
-                "down" -> Action.NOTIFICATIONS
-                "straight" -> Action.BRIGHTNESS_SLIDER
-                "up" -> Action.TOGGLE_RINGER
-                else -> Action.NONE
-            }
+    fun isVibrationEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean("vibration_enabled", true)
+    }
+
+    fun setVibrationEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("vibration_enabled", enabled)
+            .apply()
+    }
+
+    private fun defaultActionFor(gesture: Gesture): Action {
+        return when (gesture) {
+            Gesture.SINGLE_TAP -> Action.VOLUME_PANEL
+            Gesture.DOUBLE_TAP -> Action.SCREENSHOT
+            Gesture.TRIPLE_TAP -> Action.SCREEN_OFF
+            Gesture.SWIPE_UP -> Action.VOLUME_UP
+            Gesture.SWIPE_DOWN -> Action.VOLUME_DOWN
+            Gesture.SWIPE_INWARD -> Action.NOTIFICATIONS
         }
     }
 }

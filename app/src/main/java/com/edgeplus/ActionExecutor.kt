@@ -1,211 +1,98 @@
 package com.edgeplus
 
-import android.annotation.SuppressLint
+import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.media.AudioManager
-import android.os.SystemClock
-import android.provider.Settings
-import android.view.InputDevice
-import android.view.KeyEvent
-import android.view.MotionEvent
-import kotlin.math.roundToInt
 
 object ActionExecutor {
 
-    fun openVolumePanel(context: Context) {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        am?.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
-    }
-
-    fun toggleRingerMode(context: Context) {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        try {
-            when (am.ringerMode) {
-                AudioManager.RINGER_MODE_NORMAL -> {
-                    am.ringerMode = AudioManager.RINGER_MODE_VIBRATE
-                }
-                AudioManager.RINGER_MODE_VIBRATE, AudioManager.RINGER_MODE_SILENT -> {
-                    am.ringerMode = AudioManager.RINGER_MODE_NORMAL
-                }
-            }
-            am.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
-        } catch (e: Throwable) {
-            android.util.Log.e("ActionExecutor", "Failed to toggle ringer mode", e)
-        }
-    }
-
-    @SuppressLint("WrongConstant")
-    fun openNotificationPanel(context: Context) {
-        try {
-            val statusBarService = context.getSystemService("statusbar")
-            val statusBarManagerClass = Class.forName("android.app.StatusBarManager")
-            val expandMethod = statusBarManagerClass.getMethod("expandNotificationsPanel")
-            expandMethod.invoke(statusBarService)
-        } catch (e: Throwable) {
-            android.util.Log.e("ActionExecutor", "Failed to expand notifications", e)
-        }
-    }
-
-    fun getCurrentBrightness(context: Context): Int {
-        return try {
-            Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
-        } catch (_: Throwable) {
-            128
-        }
-    }
-
-    fun isAutoBrightness(context: Context): Boolean {
-        return try {
-            val mode = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE)
-            mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
-        } catch (_: Throwable) {
-            false
-        }
-    }
-
-    fun setBrightness(context: Context, value: Int) {
-        try {
-            val cr = context.contentResolver
-            // If auto-brightness is active, temporarily switch to manual so manual adjustments take effect immediately
-            val mode = Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
-            if (mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC) {
-                Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
-            }
-            val clamped = value.coerceIn(1, 255)
-            Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, clamped)
-
-            // Also set auto-brightness adjustment float (-1.0 to 1.0) so systems supporting adaptive brightness respect the offset
-            val adj = ((clamped / 255f) * 2f) - 1f
-            try {
-                Settings.System.putFloat(cr, "screen_auto_brightness_adj", adj)
-            } catch (_: Throwable) {}
-        } catch (e: Throwable) {
-            android.util.Log.e("ActionExecutor", "Failed to write brightness", e)
-        }
-    }
-
-    fun openSmartSidebar(context: Context) {
-        Thread {
-            try {
-                val imClass = Class.forName("android.hardware.input.InputManager")
-                val getInstanceMethod = imClass.getMethod("getInstance")
-                val im = getInstanceMethod.invoke(null)
-                val injectMethod = imClass.getMethod("injectInputEvent", android.view.InputEvent::class.java, Int::class.javaPrimitiveType)
-
-                // Query Vivo's exact registered gesture range in System Settings
-                var dockY = 520f
-                try {
-                    val rangeStr = Settings.Secure.getString(context.contentResolver, "side_dock_gesture_range")
-                    if (!rangeStr.isNullOrEmpty()) {
-                        val parts = rangeStr.split(";")
-                        if (parts.size >= 4) {
-                            val top = parts[1].toFloat()
-                            val bottom = parts[3].toFloat()
-                            dockY = (top + bottom) / 2f
-                        }
-                    }
-                } catch (_: Throwable) {}
-
-                val dm = context.resources.displayMetrics
-                val screenWidth = dm.widthPixels.toFloat()
-
-                val startX = screenWidth - 5f
-                val endX = screenWidth - (120f * dm.density)
-
-                val downTime = SystemClock.uptimeMillis()
-
-                fun injectTouch(action: Int, x: Float, y: Float, eventTime: Long) {
-                    val event = MotionEvent.obtain(
-                        downTime,
-                        eventTime,
-                        action,
-                        x,
-                        y,
-                        1f,
-                        1f,
-                        0,
-                        1f,
-                        1f,
-                        0,
-                        0
-                    ).apply {
-                        source = InputDevice.SOURCE_TOUCHSCREEN
-                    }
-                    injectMethod.invoke(im, event, 0)
-                    event.recycle()
-                }
-
-                injectTouch(MotionEvent.ACTION_DOWN, startX, dockY, downTime)
-
-                for (i in 1..15) {
-                    Thread.sleep(25)
-                    val currTime = SystemClock.uptimeMillis()
-                    val currX = startX + (endX - startX) * (i / 15f)
-                    injectTouch(MotionEvent.ACTION_MOVE, currX, dockY, currTime)
-                }
-
-                Thread.sleep(600) // Vivo requires a longer hold threshold on OriginOS 5
-                val upTime = SystemClock.uptimeMillis()
-                injectTouch(MotionEvent.ACTION_UP, endX, dockY, upTime)
-
-            } catch (e: Throwable) {
-                android.util.Log.e("ActionExecutor", "Failed to trigger Smart Sidebar", e)
-            }
-        }.start()
-    }
-
-    fun triggerBack() {
-        Thread {
-            android.util.Log.i("ActionExecutor", "triggerBack called")
-            try {
-                // Method 1: InputManager reflection (immediate kernel input event)
-                val imClass = Class.forName("android.hardware.input.InputManager")
-                val getInstanceMethod = imClass.getMethod("getInstance")
-                val im = getInstanceMethod.invoke(null)
-                val injectMethod = imClass.getMethod(
-                    "injectInputEvent",
-                    android.view.InputEvent::class.java,
-                    Int::class.javaPrimitiveType
-                )
-
-                val downTime = SystemClock.uptimeMillis()
-                val eventDown = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0)
-                val eventUp = KeyEvent(downTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0)
-
-                val r1 = injectMethod.invoke(im, eventDown, 0)
-                val r2 = injectMethod.invoke(im, eventUp, 0)
-                android.util.Log.i("ActionExecutor", "InputManager inject result: down=$r1 up=$r2")
-                return@Thread
-            } catch (e: Throwable) {
-                android.util.Log.w("ActionExecutor", "InputManager inject failed", e)
-            }
-
-            try {
-                // Method 2: Instrumentation
-                android.app.Instrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-                return@Thread
-            } catch (t: Throwable) {
-                android.util.Log.w("ActionExecutor", "Instrumentation inject failed", t)
-            }
-
-            try {
-                // Method 3: runtime shell input keyevent
-                Runtime.getRuntime().exec(arrayOf("input", "keyevent", "4")).waitFor()
-            } catch (r: Throwable) {
-                android.util.Log.e("ActionExecutor", "Shell inject failed", r)
-            }
-        }.start()
-    }
-
-    fun execute(context: Context, action: Action) {
+    fun execute(
+        context: Context,
+        action: Action,
+        onShowAppLauncher: () -> Unit = {}
+    ) {
         when (action) {
             Action.NONE -> {}
-            Action.BACK -> triggerBack()
-            Action.VOLUME_PANEL -> openVolumePanel(context)
-            Action.NOTIFICATIONS -> openNotificationPanel(context)
-            Action.TOGGLE_RINGER -> toggleRingerMode(context)
-            Action.BRIGHTNESS_SLIDER -> {} // Handled interactively during drag in EdgeService
+            Action.NOTIFICATIONS -> {
+                EdgeAccessibilityService.openNotifications()
+            }
+            Action.QUICK_PANEL -> {
+                EdgeAccessibilityService.openQuickPanel()
+            }
+            Action.VOLUME_UP -> {
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                am?.adjustVolume(AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+            }
+            Action.VOLUME_DOWN -> {
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                am?.adjustVolume(AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+            }
+            Action.VOLUME_PANEL -> {
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                am?.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
+            }
+            Action.SCREEN_OFF -> {
+                EdgeAccessibilityService.lockScreen()
+            }
+            Action.SCREENSHOT -> {
+                EdgeAccessibilityService.takeScreenshot()
+            }
+            Action.SCREEN_RECORD -> {
+                EdgeAccessibilityService.startScreenRecord()
+            }
+            Action.APP_LAUNCHER -> {
+                onShowAppLauncher()
+            }
+            Action.BACK -> {
+                EdgeAccessibilityService.back()
+            }
+            Action.HOME -> {
+                EdgeAccessibilityService.home()
+            }
+            Action.RECENTS -> {
+                EdgeAccessibilityService.recents()
+            }
+        }
+    }
+
+    fun launchAppInFloatingWindow(context: Context, packageName: String) {
+        try {
+            val pm = context.packageManager
+            val intent = pm.getLaunchIntentForPackage(packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            } ?: return
+
+            val options = ActivityOptions.makeBasic()
+            // Windowing mode 5 = WINDOWING_MODE_FREEFORM
+            try {
+                val method = ActivityOptions::class.java.getMethod(
+                    "setLaunchWindowingMode",
+                    Int::class.javaPrimitiveType
+                )
+                method.invoke(options, 5)
+            } catch (_: Throwable) {}
+
+            val dm = context.resources.displayMetrics
+            val width = dm.widthPixels
+            val height = dm.heightPixels
+
+            val left = (width * 0.10f).toInt()
+            val top = (height * 0.15f).toInt()
+            val right = (width * 0.90f).toInt()
+            val bottom = (height * 0.85f).toInt()
+            options.launchBounds = Rect(left, top, right, bottom)
+
+            context.startActivity(intent, options.toBundle())
+        } catch (e: Throwable) {
+            android.util.Log.e("ActionExecutor", "Failed to launch freeform", e)
+            try {
+                val fallbackIntent = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (fallbackIntent != null) context.startActivity(fallbackIntent)
+            } catch (_: Throwable) {}
         }
     }
 }

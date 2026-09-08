@@ -25,13 +25,13 @@ class MainActivity : Activity() {
 
     private lateinit var statusCard: LinearLayout
     private lateinit var overlayBadge: TextView
-    private lateinit var writeSettingsBadge: TextView
+    private lateinit var a11yBadge: TextView
     private lateinit var hzBadge: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Request 120Hz+ on Activity window
+        // Request 120Hz on Activity window
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 window.attributes.preferredRefreshRate = 120f
@@ -60,7 +60,7 @@ class MainActivity : Activity() {
         }
         scroll.addView(root)
 
-        // App Header
+        // Header
         val titleText = TextView(this).apply {
             text = "EdgePlus"
             textSize = 26f
@@ -68,7 +68,7 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         }
         val subText = TextView(this).apply {
-            text = "Volume, Notification & Back Edge (Bank Safe)"
+            text = "Assistive Floating Button & Floating Apps"
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             setPadding(0, 4, 0, 24)
@@ -76,7 +76,7 @@ class MainActivity : Activity() {
         root.addView(titleText)
         root.addView(subText)
 
-        // Service & Permission Card
+        // Status Card
         statusCard = createCardLayout()
         val cardTitle = TextView(this).apply {
             text = "SYSTEM STATUS"
@@ -88,10 +88,9 @@ class MainActivity : Activity() {
         statusCard.addView(cardTitle)
 
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
-        writeSettingsBadge = createStatusRow(statusCard, "Write Settings (Brightness)")
+        a11yBadge = createStatusRow(statusCard, "Accessibility Service")
         hzBadge = createStatusRow(statusCard, "Display Refresh Rate")
 
-        // Quick Permission Action Buttons
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -108,23 +107,18 @@ class MainActivity : Activity() {
                 )
             )
         }
-        val writeSettingsBtn = createButton("Grant Brightness", "#0F766E") {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                    Uri.parse("package:$packageName")
-                )
-            )
+        val a11yBtn = createButton("Enable A11y", "#0F766E") {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
         btnRow.addView(overlayBtn)
-        btnRow.addView(createSpacer(8))
-        btnRow.addView(writeSettingsBtn)
+        btnRow.addView(createSpacer(12))
+        btnRow.addView(a11yBtn)
         statusCard.addView(btnRow)
 
         root.addView(statusCard)
         root.addView(createVerticalSpacer(24))
 
-        // Service Start / Stop Action
+        // Service Control Buttons
         val serviceRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -132,74 +126,135 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
-        val startBtn = createButton("Start Service", "#0284C7") {
+        val startBtn = createButton("Start Floating Button", "#0284C7") {
             if (!Settings.canDrawOverlays(this@MainActivity)) {
                 return@createButton
             }
-            startService(Intent(this@MainActivity, EdgeService::class.java))
+            startService(Intent(this@MainActivity, FloatingService::class.java))
             updateStatus()
         }
-        val stopBtn = createButton("Stop Service", "#334155") {
-            stopService(Intent(this@MainActivity, EdgeService::class.java))
+        val stopBtn = createButton("Stop", "#334155") {
+            stopService(Intent(this@MainActivity, FloatingService::class.java))
             updateStatus()
         }
         serviceRow.addView(startBtn)
-        serviceRow.addView(createSpacer(16))
+        serviceRow.addView(createSpacer(12))
         serviceRow.addView(stopBtn)
         root.addView(serviceRow)
         root.addView(createVerticalSpacer(28))
 
-        // Handle Size & Haptic Section Card
-        val sizeCard = createCardLayout()
-        sizeCard.addView(createCardHeader("HANDLE & FEEDBACK"))
+        // Appearance Card
+        val appearCard = createCardLayout()
+        appearCard.addView(createCardHeader("BUTTON APPEARANCE"))
 
         val vibrateBox = CheckBox(this).apply {
-            text = "Vibrate on gesture detection"
+            text = "Haptic feedback on action"
             setTextColor(Color.parseColor("#E2E8F0"))
-            isChecked = Prefs.isVibrateOnShortSwipe(this@MainActivity)
+            isChecked = Prefs.isVibrationEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, isChecked ->
-                Prefs.setVibrateOnShortSwipe(this@MainActivity, isChecked)
+                Prefs.setVibrationEnabled(this@MainActivity, isChecked)
             }
-            setPadding(8, 16, 0, 16)
+            setPadding(8, 12, 0, 16)
         }
-        sizeCard.addView(vibrateBox)
+        appearCard.addView(vibrateBox)
 
-        buildSlider(sizeCard, "Handle Width", Prefs.getHandleWidthDp(this), 12, 60, "dp") {
-            Prefs.setHandleWidthDp(this, it)
+        buildSlider(appearCard, "Button Size", Prefs.getButtonSizeDp(this), 38, 75, "dp") {
+            Prefs.setButtonSizeDp(this, it)
             reloadService()
         }
-        buildSlider(sizeCard, "Handle Height", Prefs.getHandleHeightPercent(this), 25, 100, "%") {
-            Prefs.setHandleHeightPercent(this, it)
+        buildSlider(appearCard, "Idle Opacity", Prefs.getButtonAlphaIdle(this), 20, 100, "%") {
+            Prefs.setButtonAlphaIdle(this, it)
             reloadService()
         }
-        buildSlider(sizeCard, "Transparency", Prefs.getHandleAlphaPercent(this), 0, 100, "%") {
-            Prefs.setHandleAlphaPercent(this, it)
-            reloadService()
-        }
-        root.addView(sizeCard)
+        root.addView(appearCard)
         root.addView(createVerticalSpacer(24))
 
-        // Right Handle Gestures Card
-        val rightCard = createCardLayout()
-        rightCard.addView(createCardHeader("RIGHT HANDLE GESTURES"))
-        buildGestureGroup(rightCard, side = "right", type = "short", labelPrefix = "Short Swipe")
-        buildGestureGroup(rightCard, side = "right", type = "long", labelPrefix = "Long Swipe")
-        root.addView(rightCard)
-        root.addView(createVerticalSpacer(24))
+        // Gesture Actions Card
+        val gestureCard = createCardLayout()
+        gestureCard.addView(createCardHeader("BUTTON GESTURE MAPPINGS"))
+        val note = TextView(this).apply {
+            text = "• Hold and drag to move anywhere (auto-sticks to edge)\n• Swipes and multi-taps trigger actions below"
+            textSize = 12f
+            setTextColor(Color.parseColor("#94A3B8"))
+            setPadding(0, 0, 0, 16)
+        }
+        gestureCard.addView(note)
 
-        // Left Handle Gestures Card
-        val leftCard = createCardLayout()
-        leftCard.addView(createCardHeader("LEFT HANDLE GESTURES"))
-        buildGestureGroup(leftCard, side = "left", type = "short", labelPrefix = "Short Swipe")
-        buildGestureGroup(leftCard, side = "left", type = "long", labelPrefix = "Long Swipe")
-        root.addView(leftCard)
+        val gestures = Gesture.entries
+        val actions = Action.entries
+        val actionTitles = actions.map { it.title }
 
+        for (g in gestures) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 6, 0, 12)
+            }
+
+            val label = TextView(this).apply {
+                text = g.title
+                textSize = 13f
+                setTextColor(Color.parseColor("#94A3B8"))
+            }
+            row.addView(label)
+
+            val spinner = Spinner(this).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#334155"))
+                    cornerRadius = 12f
+                    setStroke(2, Color.parseColor("#64748B"))
+                }
+                setPadding(24, 16, 24, 16)
+            }
+
+            val adapter = object : ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                actionTitles
+            ) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val v = super.getView(position, convertView, parent)
+                    (v as? TextView)?.apply {
+                        setTextColor(Color.WHITE)
+                        textSize = 14f
+                        typeface = Typeface.DEFAULT_BOLD
+                    }
+                    return v
+                }
+
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val v = super.getDropDownView(position, convertView, parent)
+                    (v as? TextView)?.apply {
+                        setTextColor(Color.parseColor("#0F172A"))
+                        setBackgroundColor(Color.WHITE)
+                        textSize = 15f
+                        setPadding(32, 24, 32, 24)
+                    }
+                    return v
+                }
+            }
+            spinner.adapter = adapter
+
+            val currentAction = Prefs.getAction(this, g)
+            spinner.setSelection(actions.indexOf(currentAction))
+
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, position: Int, id: Long) {
+                    Prefs.setAction(this@MainActivity, g, actions[position])
+                }
+                override fun onNothingSelected(p0: AdapterView<*>?) {}
+            }
+
+            row.addView(spinner)
+            gestureCard.addView(row)
+        }
+
+        root.addView(gestureCard)
         setContentView(scroll)
     }
 
     private fun reloadService() {
-        val intent = Intent(this, EdgeService::class.java).apply {
-            action = EdgeService.ACTION_RELOAD
+        val intent = Intent(this, FloatingService::class.java).apply {
+            action = FloatingService.ACTION_RELOAD
         }
         startService(intent)
     }
@@ -268,10 +323,7 @@ class MainActivity : Activity() {
     private fun createSpacer(sizeDp: Int): View {
         val px = (sizeDp * resources.displayMetrics.density).toInt()
         return View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                px,
-                px
-            )
+            layoutParams = LinearLayout.LayoutParams(px, px)
         }
     }
 
@@ -322,84 +374,6 @@ class MainActivity : Activity() {
         parent.addView(row)
     }
 
-    private fun buildGestureGroup(
-        parent: LinearLayout,
-        side: String,
-        type: String,
-        labelPrefix: String
-    ) {
-        val directions = listOf(
-            "straight" to "$labelPrefix • Inward",
-            "down" to "$labelPrefix • Diagonal Down",
-            "up" to "$labelPrefix • Diagonal Up"
-        )
-        val actions = Action.entries
-        val actionTitles = actions.map { it.title }
-
-        for ((dir, label) in directions) {
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 8, 0, 12)
-            }
-
-            val text = TextView(this).apply {
-                this.text = label
-                textSize = 13f
-                setTextColor(Color.parseColor("#94A3B8"))
-            }
-            row.addView(text)
-
-            val spinner = Spinner(this).apply {
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#334155")) // Slate 700 - clearly visible
-                    cornerRadius = 12f
-                    setStroke(2, Color.parseColor("#64748B"))
-                }
-                setPadding(24, 16, 24, 16)
-            }
-            val adapter = object : ArrayAdapter<String>(
-                this,
-                android.R.layout.simple_spinner_dropdown_item,
-                actionTitles
-            ) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val v = super.getView(position, convertView, parent)
-                    (v as? TextView)?.apply {
-                        setTextColor(Color.WHITE)
-                        textSize = 14f
-                        typeface = Typeface.DEFAULT_BOLD
-                    }
-                    return v
-                }
-
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val v = super.getDropDownView(position, convertView, parent)
-                    (v as? TextView)?.apply {
-                        setTextColor(Color.parseColor("#0F172A"))
-                        setBackgroundColor(Color.WHITE)
-                        textSize = 15f
-                        setPadding(32, 24, 32, 24)
-                    }
-                    return v
-                }
-            }
-            spinner.adapter = adapter
-
-            val currentAction = Prefs.getAction(this, side, type, dir)
-            spinner.setSelection(actions.indexOf(currentAction))
-
-            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, position: Int, id: Long) {
-                    Prefs.setAction(this@MainActivity, side, type, dir, actions[position])
-                }
-                override fun onNothingSelected(p0: AdapterView<*>?) {}
-            }
-
-            row.addView(spinner)
-            parent.addView(row)
-        }
-    }
-
     override fun onResume() {
         super.onResume()
         updateStatus()
@@ -410,9 +384,9 @@ class MainActivity : Activity() {
         overlayBadge.text = if (overlayOk) "GRANTED" else "MISSING"
         overlayBadge.setTextColor(Color.parseColor(if (overlayOk) "#4ADE80" else "#F87171"))
 
-        val writeSettingsOk = Settings.System.canWrite(this)
-        writeSettingsBadge.text = if (writeSettingsOk) "GRANTED" else "MISSING"
-        writeSettingsBadge.setTextColor(Color.parseColor(if (writeSettingsOk) "#4ADE80" else "#F87171"))
+        val a11yOk = EdgeAccessibilityService.isRunning()
+        a11yBadge.text = if (a11yOk) "RUNNING" else "DISABLED"
+        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#4ADE80" else "#F87171"))
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
