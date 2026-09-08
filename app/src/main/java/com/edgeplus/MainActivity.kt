@@ -26,6 +26,7 @@ class MainActivity : Activity() {
     private lateinit var statusCard: LinearLayout
     private lateinit var overlayBadge: TextView
     private lateinit var a11yBadge: TextView
+    private lateinit var writeSettingsBadge: TextView
     private lateinit var hzBadge: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,6 +90,7 @@ class MainActivity : Activity() {
 
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
         a11yBadge = createStatusRow(statusCard, "Accessibility Service")
+        writeSettingsBadge = createStatusRow(statusCard, "Write Settings (Screen Rotate)")
         hzBadge = createStatusRow(statusCard, "Display Refresh Rate")
 
         val btnRow = LinearLayout(this).apply {
@@ -110,9 +112,19 @@ class MainActivity : Activity() {
         val a11yBtn = createButton("Enable A11y", "#0F766E") {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        val writeBtn = createButton("Grant Rotate", "#475569") {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
         btnRow.addView(overlayBtn)
-        btnRow.addView(createSpacer(12))
+        btnRow.addView(createSpacer(8))
         btnRow.addView(a11yBtn)
+        btnRow.addView(createSpacer(8))
+        btnRow.addView(writeBtn)
         statusCard.addView(btnRow)
 
         root.addView(statusCard)
@@ -387,6 +399,10 @@ class MainActivity : Activity() {
         val a11yOk = EdgeAccessibilityService.isRunning()
         a11yBadge.text = if (a11yOk) "RUNNING" else "DISABLED"
         a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#4ADE80" else "#F87171"))
+
+        val writeOk = Settings.System.canWrite(this)
+        writeSettingsBadge.text = if (writeOk) "GRANTED" else "MISSING"
+        writeSettingsBadge.setTextColor(Color.parseColor(if (writeOk) "#4ADE80" else "#F87171"))
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

@@ -277,14 +277,25 @@ class FloatingService : Service() {
                             val swipeThreshold = 24 * density
                             val currentIsRight = Prefs.isAttachedRight(this@FloatingService)
                             val inwardDist = if (currentIsRight) -dx else dx
+                            val absDy = abs(dy)
 
                             if (dist >= swipeThreshold) {
                                 gestureFired = true
                                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
-                                if (abs(dy) >= swipeThreshold && abs(dy) > inwardDist) {
+
+                                if (absDy >= swipeThreshold && absDy > (inwardDist * 2.0f)) {
+                                    // Pure vertical swipe
                                     if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
-                                } else if (inwardDist >= swipeThreshold) {
-                                    dispatchGesture(Gesture.SWIPE_INWARD)
+                                } else if (inwardDist >= (18 * density)) {
+                                    // Inward or Diagonal swipe
+                                    val slope = absDy / inwardDist.coerceAtLeast(1f)
+                                    if (absDy >= (16 * density) && slope > 0.40f) {
+                                        if (dy < 0) dispatchGesture(Gesture.SWIPE_DIAGONAL_UP) else dispatchGesture(Gesture.SWIPE_DIAGONAL_DOWN)
+                                    } else {
+                                        dispatchGesture(Gesture.SWIPE_INWARD)
+                                    }
+                                } else if (absDy >= swipeThreshold) {
+                                    if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
                                 }
                             }
                         }

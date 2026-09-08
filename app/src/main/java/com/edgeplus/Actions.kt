@@ -6,9 +6,11 @@ enum class Gesture(val id: String, val title: String) {
     SINGLE_TAP("single_tap", "Single Tap"),
     DOUBLE_TAP("double_tap", "Double Tap"),
     TRIPLE_TAP("triple_tap", "Triple Tap"),
-    SWIPE_UP("swipe_up", "Swipe Up"),
-    SWIPE_DOWN("swipe_down", "Swipe Down"),
-    SWIPE_INWARD("swipe_inward", "Swipe Inward");
+    SWIPE_INWARD("swipe_inward", "Swipe Inward (Lurus Masuk)"),
+    SWIPE_DIAGONAL_UP("swipe_diag_up", "Swipe Diagonal Up (Serong Atas)"),
+    SWIPE_DIAGONAL_DOWN("swipe_diag_down", "Swipe Diagonal Down (Serong Bawah)"),
+    SWIPE_UP("swipe_up", "Swipe Up (Tegak Atas)"),
+    SWIPE_DOWN("swipe_down", "Swipe Down (Tegak Bawah)");
 
     companion object {
         fun fromId(id: String?): Gesture = entries.firstOrNull { it.id == id } ?: SINGLE_TAP
@@ -18,6 +20,8 @@ enum class Gesture(val id: String, val title: String) {
 enum class Action(val id: String, val title: String) {
     NONE("none", "None"),
     SWITCH_SIDE("switch_side", "Move to Opposite Edge (Pindah Seberang)"),
+    ROTATE_SCREEN("rotate_screen", "Rotate Phone (Portrait ⇄ Landscape)"),
+    TOGGLE_AUTO_ROTATE("toggle_auto_rotate", "Toggle Auto-Rotate"),
     NOTIFICATIONS("notifications", "Open Notification Panel"),
     QUICK_PANEL("quick_panel", "Open Quick Settings"),
     VOLUME_UP("volume_up", "Volume Up"),
@@ -117,9 +121,11 @@ object Prefs {
             Gesture.SINGLE_TAP -> Action.VOLUME_PANEL
             Gesture.DOUBLE_TAP -> Action.SCREENSHOT
             Gesture.TRIPLE_TAP -> Action.SCREEN_OFF
+            Gesture.SWIPE_INWARD -> Action.BACK
+            Gesture.SWIPE_DIAGONAL_UP -> Action.ROTATE_SCREEN
+            Gesture.SWIPE_DIAGONAL_DOWN -> Action.NOTIFICATIONS
             Gesture.SWIPE_UP -> Action.VOLUME_UP
             Gesture.SWIPE_DOWN -> Action.VOLUME_DOWN
-            Gesture.SWIPE_INWARD -> Action.NOTIFICATIONS
         }
     }
 }
