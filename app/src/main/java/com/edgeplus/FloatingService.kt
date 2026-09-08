@@ -222,7 +222,6 @@ class FloatingService : Service() {
             private var initialWindowX = 0
             private var initialWindowY = 0
             private var isDragging = false
-            private var gestureFired = false
 
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 val curScreenWidth: Int
@@ -244,7 +243,6 @@ class FloatingService : Service() {
                         initialWindowX = params.x
                         initialWindowY = params.y
                         isDragging = false
-                        gestureFired = false
 
                         innerCircle.alpha = 0.95f
 
@@ -258,8 +256,6 @@ class FloatingService : Service() {
                     }
 
                     MotionEvent.ACTION_MOVE -> {
-                        if (gestureFired) return true
-
                         val dx = event.rawX - startRawX
                         val dy = event.rawY - startRawY
                         val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
@@ -272,32 +268,6 @@ class FloatingService : Service() {
                             if (dist > touchSlop) {
                                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
                             }
-
-                            val density = resources.displayMetrics.density
-                            val swipeThreshold = 24 * density
-                            val currentIsRight = Prefs.isAttachedRight(this@FloatingService)
-                            val inwardDist = if (currentIsRight) -dx else dx
-                            val absDy = abs(dy)
-
-                            if (dist >= swipeThreshold) {
-                                gestureFired = true
-                                longPressRunnable?.let { mainHandler.removeCallbacks(it) }
-
-                                if (absDy >= swipeThreshold && absDy > (inwardDist * 2.0f)) {
-                                    // Pure vertical swipe
-                                    if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
-                                } else if (inwardDist >= (18 * density)) {
-                                    // Inward or Diagonal swipe
-                                    val slope = absDy / inwardDist.coerceAtLeast(1f)
-                                    if (absDy >= (16 * density) && slope > 0.40f) {
-                                        if (dy < 0) dispatchGesture(Gesture.SWIPE_DIAGONAL_UP) else dispatchGesture(Gesture.SWIPE_DIAGONAL_DOWN)
-                                    } else {
-                                        dispatchGesture(Gesture.SWIPE_INWARD)
-                                    }
-                                } else if (absDy >= swipeThreshold) {
-                                    if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
-                                }
-                            }
                         }
                         return true
                     }
@@ -307,10 +277,9 @@ class FloatingService : Service() {
                         innerCircle.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start()
                         innerCircle.alpha = idleAlphaPercent / 100f
 
-                        if (gestureFired) {
-                            gestureFired = false
-                            return true
-                        }
+                        val dx = event.rawX - startRawX
+                        val dy = event.rawY - startRawY
+                        val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 
                         if (isDragging) {
                             isDragging = false
@@ -319,7 +288,7 @@ class FloatingService : Service() {
                             val targetX = if (snapRight) curScreenWidth - sizePx else 0
 
                             ValueAnimator.ofInt(params.x, targetX).apply {
-                                duration = 140
+                                duration = 160
                                 interpolator = DecelerateInterpolator()
                                 addUpdateListener { va ->
                                     params.x = va.animatedValue as Int
@@ -333,7 +302,28 @@ class FloatingService : Service() {
                             Prefs.setLastPositionYPercent(this@FloatingService, finalYPercent)
                             vibrateTick(heavy = false)
                         } else {
-                            registerTap()
+                            val density = resources.displayMetrics.density
+                            val swipeThreshold = 28 * density
+                            val currentIsRight = Prefs.isAttachedRight(this@FloatingService)
+                            val inwardDist = if (currentIsRight) -dx else dx
+                            val absDy = abs(dy)
+
+                            if (dist >= swipeThreshold) {
+                                if (absDy >= swipeThreshold && absDy > (inwardDist * 2.0f)) {
+                                    if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
+                                } else if (inwardDist >= (18 * density)) {
+                                    val slope = absDy / inwardDist.coerceAtLeast(1f)
+                                    if (absDy >= (16 * density) && slope > 0.40f) {
+                                        if (dy < 0) dispatchGesture(Gesture.SWIPE_DIAGONAL_UP) else dispatchGesture(Gesture.SWIPE_DIAGONAL_DOWN)
+                                    } else {
+                                        dispatchGesture(Gesture.SWIPE_INWARD)
+                                    }
+                                } else if (absDy >= swipeThreshold) {
+                                    if (dy < 0) dispatchGesture(Gesture.SWIPE_UP) else dispatchGesture(Gesture.SWIPE_DOWN)
+                                }
+                            } else {
+                                registerTap()
+                            }
                         }
                         return true
                     }
@@ -377,14 +367,6 @@ class FloatingService : Service() {
     }
 
     private fun registerTap() {
-        val hasDouble = Prefs.getAction(this, Gesture.DOUBLE_TAP) != Action.NONE
-        val hasTriple = Prefs.getAction(this, Gesture.TRIPLE_TAP) != Action.NONE
-
-        if (!hasDouble && !hasTriple) {
-            dispatchGesture(Gesture.SINGLE_TAP)
-            return
-        }
-
         tapCount++
         tapRunnable?.let { mainHandler.removeCallbacks(it) }
 
@@ -403,7 +385,7 @@ class FloatingService : Service() {
                 dispatchGesture(Gesture.DOUBLE_TAP)
             }
         }
-        mainHandler.postDelayed(tapRunnable!!, 170)
+        mainHandler.postDelayed(tapRunnable!!, 280)
     }
 
     private fun dispatchGesture(gesture: Gesture) {
