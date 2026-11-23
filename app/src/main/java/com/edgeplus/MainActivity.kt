@@ -20,14 +20,20 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 
 class MainActivity : Activity() {
 
     private lateinit var statusCard: LinearLayout
+    private lateinit var rootModeBox: CheckBox
+    private lateinit var rootBadge: TextView
     private lateinit var overlayBadge: TextView
     private lateinit var a11yBadge: TextView
     private lateinit var writeSettingsBadge: TextView
     private lateinit var hzBadge: TextView
+    private lateinit var overlayBtn: Button
+    private lateinit var a11yBtn: Button
+    private lateinit var writeBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +94,43 @@ class MainActivity : Activity() {
         }
         statusCard.addView(cardTitle)
 
+        rootModeBox = CheckBox(this).apply {
+            text = "Root Mode (No Accessibility Needed)"
+            setTextColor(Color.parseColor("#F8FAFC"))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            isChecked = Prefs.isRootMode(this@MainActivity)
+            setPadding(4, 0, 0, 12)
+            setOnClickListener {
+                if (isChecked) {
+                    isEnabled = false
+                    rootBadge.text = "CHECKING..."
+                    rootBadge.setTextColor(Color.parseColor("#FBBF24"))
+                    Thread {
+                        val ok = RootShell.requestRootAndGrantPermissions(packageName)
+                        runOnUiThread {
+                            isEnabled = true
+                            if (ok) {
+                                Prefs.setRootMode(this@MainActivity, true)
+                                Toast.makeText(this@MainActivity, "Root Mode enabled", Toast.LENGTH_SHORT).show()
+                            } else {
+                                isChecked = false
+                                Prefs.setRootMode(this@MainActivity, false)
+                                Toast.makeText(this@MainActivity, "Root access denied", Toast.LENGTH_SHORT).show()
+                            }
+                            updateStatus()
+                        }
+                    }.start()
+                } else {
+                    Prefs.setRootMode(this@MainActivity, false)
+                    RootShell.close()
+                    updateStatus()
+                }
+            }
+        }
+        statusCard.addView(rootModeBox)
+
+        rootBadge = createStatusRow(statusCard, "Root Access")
         overlayBadge = createStatusRow(statusCard, "Overlay Permission")
         a11yBadge = createStatusRow(statusCard, "Accessibility Service")
         writeSettingsBadge = createStatusRow(statusCard, "Write Settings (Screen Rotate)")
@@ -101,7 +144,7 @@ class MainActivity : Activity() {
             )
             setPadding(0, 24, 0, 0)
         }
-        val overlayBtn = createButton("Grant Overlay", "#0284C7") {
+        overlayBtn = createButton("Grant Overlay", "#0284C7") {
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -109,10 +152,10 @@ class MainActivity : Activity() {
                 )
             )
         }
-        val a11yBtn = createButton("Enable A11y", "#0F766E") {
+        a11yBtn = createButton("Enable A11y", "#0F766E") {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
-        val writeBtn = createButton("Grant Rotate", "#475569") {
+        writeBtn = createButton("Grant Rotate", "#475569") {
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_WRITE_SETTINGS,
@@ -140,6 +183,21 @@ class MainActivity : Activity() {
         }
         val startBtn = createButton("Start Floating Button", "#0284C7") {
             if (!Settings.canDrawOverlays(this@MainActivity)) {
+                if (Prefs.isRootMode(this@MainActivity)) {
+                    Thread {
+                        val ok = RootShell.requestRootAndGrantPermissions(packageName)
+                        runOnUiThread {
+                            if (ok && Settings.canDrawOverlays(this@MainActivity)) {
+                                startService(Intent(this@MainActivity, FloatingService::class.java))
+                                updateStatus()
+                            } else {
+                                Toast.makeText(this@MainActivity, "Overlay permission required", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }.start()
+                } else {
+                    Toast.makeText(this@MainActivity, "Grant Overlay permission first", Toast.LENGTH_SHORT).show()
+                }
                 return@createButton
             }
             startService(Intent(this@MainActivity, FloatingService::class.java))
@@ -392,17 +450,41 @@ class MainActivity : Activity() {
     }
 
     private fun updateStatus() {
+        val rootMode = Prefs.isRootMode(this)
+        rootModeBox.isChecked = rootMode
+
+        if (rootMode) {
+            rootBadge.text = "ACTIVE"
+            rootBadge.setTextColor(Color.parseColor("#4ADE80"))
+        } else {
+            rootBadge.text = "OFF"
+            rootBadge.setTextColor(Color.parseColor("#94A3B8"))
+        }
+
         val overlayOk = Settings.canDrawOverlays(this)
         overlayBadge.text = if (overlayOk) "GRANTED" else "MISSING"
         overlayBadge.setTextColor(Color.parseColor(if (overlayOk) "#4ADE80" else "#F87171"))
 
         val a11yOk = EdgeAccessibilityService.isRunning()
-        a11yBadge.text = if (a11yOk) "RUNNING" else "DISABLED"
-        a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#4ADE80" else "#F87171"))
+        if (rootMode) {
+            a11yBadge.text = "BYPASSED (Root)"
+            a11yBadge.setTextColor(Color.parseColor("#4ADE80"))
+        } else {
+            a11yBadge.text = if (a11yOk) "RUNNING" else "DISABLED"
+            a11yBadge.setTextColor(Color.parseColor(if (a11yOk) "#4ADE80" else "#F87171"))
+        }
 
         val writeOk = Settings.System.canWrite(this)
-        writeSettingsBadge.text = if (writeOk) "GRANTED" else "MISSING"
-        writeSettingsBadge.setTextColor(Color.parseColor(if (writeOk) "#4ADE80" else "#F87171"))
+        if (rootMode && !writeOk) {
+            writeSettingsBadge.text = "BYPASSED (Root)"
+            writeSettingsBadge.setTextColor(Color.parseColor("#4ADE80"))
+        } else {
+            writeSettingsBadge.text = if (writeOk) "GRANTED" else "MISSING"
+            writeSettingsBadge.setTextColor(Color.parseColor(if (writeOk) "#4ADE80" else "#F87171"))
+        }
+
+        a11yBtn.visibility = if (rootMode) View.GONE else View.VISIBLE
+        writeBtn.visibility = if (rootMode) View.GONE else View.VISIBLE
 
         val currentRate = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

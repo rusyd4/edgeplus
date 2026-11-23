@@ -116,6 +116,18 @@ object Prefs {
             .apply()
     }
 
+    fun isRootMode(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean("root_mode", false)
+    }
+
+    fun setRootMode(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("root_mode", enabled)
+            .apply()
+    }
+
     private fun defaultActionFor(gesture: Gesture): Action {
         return when (gesture) {
             Gesture.SINGLE_TAP -> Action.VOLUME_PANEL

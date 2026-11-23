@@ -67,6 +67,9 @@ class FloatingService : Service() {
         })
 
         createFloatingButton()
+        if (Prefs.isRootMode(this)) {
+            RootShell.warmUp()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -420,6 +423,7 @@ class FloatingService : Service() {
         super.onDestroy()
         removeFloatingButton()
         mainHandler.removeCallbacksAndMessages(null)
+        RootShell.close()
     }
 
     companion object {
